@@ -143,7 +143,7 @@ class QueryCompiler:
         ################ now rules to reject ################
 
         # Check .only() rules
-        if qs._only and full_field_name not in qs._only:
+        if qs._only and not (full_field_name in qs._only or (prefix and prefix in qs._only)):
             return False
 
         # Check that the prefix is also in select_related and not in embedded endpoints
