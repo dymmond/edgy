@@ -4,7 +4,7 @@
 
 ### Added
 
-- Add different anchor points for prefetches which allows prefetching cross database.
+- Add different anchor points for prefetches which allows prefetching across databases.
 - Allow sub-attributes (select_related) for prefetches as anchor.
 - Allow chaining `to_attr` to anchor by prefixing with `+`.
 - `crawl_relationship` has now a mode to traverse databases.
@@ -24,7 +24,7 @@
 - Add embedded path implicit to select_related paths.
 - `crawl_relationship` has now a better error when a field does not exist.
 - Unpacking and accessing `CrawlResult` (the result of `crawl_relationship`) is now deprecated. Use the results attributes instead.
-- Don't select unneccessary columns.
+- Don't select unneccessary intermediate columns when specifying select paths. This is potential breaking.
 
 ### Fixed
 
@@ -41,6 +41,8 @@
 ### Breaking
 
 - `crawl_relationship` returns now not `exact` as `operator`, when no operator was found but an empty string.
+- `select_related` intermediate paths aren't fully loaded anymore. Only the relevant columns for traversing are selected.
+  Upgrade `select_related("company__user")` to `select_related("company","company__user")`
 
 ## 0.36.1
 

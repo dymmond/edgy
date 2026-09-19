@@ -16,7 +16,11 @@ modelsc = edgy.Registry(database=database2)
 class Track(edgy.Model):
     id = edgy.BigIntegerField(primary_key=True, autoincrement=True)
     album = edgy.ForeignKey(
-        "Album", on_delete=edgy.CASCADE, related_name="tracks", related_fields=("name",)
+        "Album",
+        on_delete=edgy.CASCADE,
+        related_name="tracks",
+        related_fields=("name",),
+        secret=True,
     )
     title = edgy.CharField(max_length=100)
     position = edgy.IntegerField()
@@ -26,7 +30,7 @@ class Track(edgy.Model):
 
 
 class Album(edgy.Model):
-    name = edgy.CharField(max_length=255, unique=True)
+    name = edgy.CharField(max_length=255, unique=True, secret=True)
 
     class Meta:
         registry = modelsa
@@ -61,7 +65,9 @@ async def create_test_database():
 
 
 @pytest.mark.parametrize("target_prefix", ["", "+", "studio__album__"])
-async def test_prefetch_crossdb_pivot(target_prefix: str):
+# exclude_secrets=True validates that the force include works
+@pytest.mark.parametrize("exclude_secrets", [True, False])
+async def test_prefetch_crossdb_pivot(target_prefix: str, exclude_secrets: bool):
     album = await Album.query.create(name="Malibu")
     track1 = await Track.query.create(album=album, title="The Bird", position=3)
     track2 = await Track.query.create(album=album, title="Heart don't stand a chance", position=2)
@@ -78,12 +84,16 @@ async def test_prefetch_crossdb_pivot(target_prefix: str):
     assert company.studio is not None
     assert company.studio.album is not None
 
-    companies = await Company.query.order_by("id").prefetch_related(
-        edgy.Prefetch(
-            to_attr=f"{target_prefix}sorted_tracks",
-            queryset=Track.query.order_by("-position"),
-            from_anchor="studio__album",
-            related_name="tracks",
+    companies = (
+        await Company.query.order_by("id")
+        .exclude_secrets(exclude_secrets)
+        .prefetch_related(
+            edgy.Prefetch(
+                to_attr=f"{target_prefix}sorted_tracks",
+                queryset=Track.query.order_by("-position"),
+                from_anchor="studio__album",
+                related_name="tracks",
+            )
         )
     )
     assert companies[0].studio is None
@@ -95,7 +105,8 @@ async def test_prefetch_crossdb_pivot(target_prefix: str):
         assert companies[1].sorted_tracks == [track1, track2, track3]
 
 
-async def test_prefetch_crossdb_mid():
+@pytest.mark.parametrize("exclude_secrets", [True, False])
+async def test_prefetch_crossdb_mid(exclude_secrets):
     album = await Album.query.create(name="Malibu")
     track1 = await Track.query.create(album=album, title="The Bird", position=3)
     track2 = await Track.query.create(album=album, title="Heart don't stand a chance", position=2)
@@ -110,12 +121,16 @@ async def test_prefetch_crossdb_mid():
     stud.primary_company = comp
     await stud.save()
 
-    studios = await Studio.query.order_by("id").prefetch_related(
-        edgy.Prefetch(
-            to_attr="primary_company__sorted_tracks",
-            queryset=Track.query.order_by("-position"),
-            from_anchor="album",
-            related_name="tracks",
+    studios = (
+        await Studio.query.order_by("id")
+        .exclude_secrets(exclude_secrets)
+        .prefetch_related(
+            edgy.Prefetch(
+                to_attr="primary_company__sorted_tracks",
+                queryset=Track.query.order_by("-position"),
+                from_anchor="album",
+                related_name="tracks",
+            )
         )
     )
     assert studios[0].primary_company is None
