@@ -206,7 +206,7 @@ class BaseModelType(ABC):
             force_insert (bool): If `True`, forces an SQL INSERT operation, even if
                                  the instance might already exist (e.g., if primary key is set).
                                  Defaults to `False`.
-            values (dict[str, Any] | set[str] | list[str] | None): Optional. A dictionary of
+            values (dict[str, Any] | set[str] | None): Optional. A dictionary of
                                                                  values to save, or a set/list
                                                                  of field names to save.
                                                                  Defaults to `None`.
