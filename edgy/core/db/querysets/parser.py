@@ -62,12 +62,11 @@ class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
         )
         result = await self._row_to_model_uncached(row)
         if prepared_prefetches:
-            await self.queryset._apply_prefetches_self_and_select_related(
+            await self.queryset._apply_prefetches_self_and_related(
                 instance=result,
                 tables_and_models=self.tables_and_models,
                 mapping=row._mapping,
                 prepared_prefetches=prepared_prefetches,
-                seen=set(),
             )
         return result
 
