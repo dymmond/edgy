@@ -48,15 +48,21 @@ async def create_test_database():
 @pytest.mark.parametrize(
     "query_fn,single_result",
     [
-        pytest.param(lambda group: User.query.defer("description"), False, id="direct"),
         pytest.param(
-            lambda group: Profile.query.update_embed_parent(("user", "")).defer(
-                "user__description"
+            lambda group: User.query.defer("description").order_by("id"), False, id="direct"
+        ),
+        pytest.param(
+            lambda group: (
+                Profile.query.update_embed_parent(("user", ""))
+                .order_by("user__id")
+                .defer("user__description")
             ),
             True,
             id="single",
         ),
-        pytest.param(lambda group: group.users.defer("description"), False, id="multi"),
+        pytest.param(
+            lambda group: group.users.defer("description").order_by("id"), False, id="multi"
+        ),
     ],
 )
 async def test_queryset_defer(query_fn, single_result):

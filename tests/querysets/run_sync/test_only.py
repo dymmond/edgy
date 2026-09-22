@@ -58,15 +58,21 @@ async def test_raise_QuerySetError_on_only_and_defer():
 @pytest.mark.parametrize(
     "query_fn,single_result",
     [
-        pytest.param(lambda group: User.query.only("name", "language"), False, id="direct"),
         pytest.param(
-            lambda group: Profile.query.update_embed_parent(("user", "")).only(
-                "user__name", "user__language"
+            lambda group: User.query.only("name", "language").order_by("id"), False, id="direct"
+        ),
+        pytest.param(
+            lambda group: (
+                Profile.query.update_embed_parent(("user", ""))
+                .only("user__name", "user__language")
+                .order_by("user__id")
             ),
             True,
             id="single",
         ),
-        pytest.param(lambda group: group.users.only("name", "language"), False, id="multi"),
+        pytest.param(
+            lambda group: group.users.only("name", "language").order_by("id"), False, id="multi"
+        ),
     ],
 )
 async def test_only(query_fn, single_result):

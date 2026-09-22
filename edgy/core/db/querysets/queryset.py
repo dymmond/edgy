@@ -346,7 +346,8 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             sqlalchemy.sql.expression.BinaryExpression
             | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
         ]
-        | dict[str, Any],
+        | dict[str, Any]
+        | QuerySetType,
         **kwargs: Any,
     ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
