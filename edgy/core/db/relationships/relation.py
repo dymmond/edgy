@@ -130,10 +130,10 @@ class ManyRelation(ManyRelationProtocol):
 
         # Set the embed_parent attribute on the queryset for embedding the 'to' model.
         # If embed_through is an empty string, it defaults to False.
-        queryset.embed_parent = (self.to_foreign_key, self.embed_through or "")
+        queryset._embed_parent = (self.to_foreign_key, self.embed_through or "")
         # If embed_through is not "",  use modern logic.
         if self.embed_through != "":
-            queryset.embed_parent_filters = queryset.embed_parent
+            queryset._embed_parent_filters = queryset._embed_parent
         # because we set embed_parent directly, this is required
         if not self.through.meta.fields[self.to_foreign_key].is_cross_db():
             # not initialized yet, so add it manually
@@ -637,7 +637,7 @@ class SingleRelation(ManyRelationProtocol):
         self.to = to
         self.reverse_name = reverse_name
         self.to_foreign_key = to_foreign_key
-        self.embed_parent = embed_parent
+        self._embed_parent = embed_parent
         self.refs: list[BaseModelType] = []  # Initialize refs as a list
         # Ensure refs is a sequence; if not, wrap it in a list.
         if not isinstance(refs, Sequence):
@@ -686,16 +686,16 @@ class SingleRelation(ManyRelationProtocol):
         queryset = queryset.filter(**{self.to_foreign_key: query})
 
         # Set the embed_parent attribute on the queryset for embedding.
-        queryset.embed_parent = self.embed_parent
-        # Apply embed_parent_filters only if embed_parent is set and the field is a RelationshipField.
-        if self.embed_parent:
-            embed_parent_field_name = self.embed_parent[0].split("__", 1)[0]
+        queryset._embed_parent = self._embed_parent
+        # Apply _embed_parent_filters only if embed_parent is set and the field is a RelationshipField.
+        if queryset._embed_parent:
+            embed_parent_field_name = queryset._embed_parent[0].split("__", 1)[0]
             embed_parent_field = fk.owner.meta.fields[embed_parent_field_name]
             if isinstance(
                 embed_parent_field,
                 RelationshipField,
             ):
-                queryset.embed_parent_filters = queryset.embed_parent
+                queryset._embed_parent_filters = queryset._embed_parent
         return queryset
 
     def all(self, clear_cache: bool = False) -> QuerySet:

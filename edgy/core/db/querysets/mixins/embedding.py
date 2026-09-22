@@ -223,10 +223,10 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                 tables_and_models = (await self_queryset.as_select_with_tables())[1]
             # apply embedding
             prefetched_instance = result
-            if self_queryset.embed_parent_filters and self_queryset.embed_parent_filters[0]:
+            if self_queryset._embed_parent_filters and self_queryset._embed_parent_filters[0]:
                 token = MODEL_GETATTR_BEHAVIOR.set("coro")
                 try:
-                    for part in self_queryset.embed_parent_filters[0].split("__"):
+                    for part in self_queryset._embed_parent_filters[0].split("__"):
                         prefetched_instance = getattr(prefetched_instance, part)
                         if isawaitable(prefetched_instance):
                             prefetched_instance = await prefetched_instance
@@ -238,22 +238,22 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                 mapping=mapping,
                 tables_and_models=tables_and_models,
             )
-        if not self_queryset.embed_parent:
+        if not self_queryset._embed_parent:
             return result, cast("EdgyEmbedTarget", result)
         prefix = ""
         token = MODEL_GETATTR_BEHAVIOR.set("coro")
         try:
             new_result: Any = result
-            for part in self_queryset.embed_parent[0].split("__"):
+            for part in self_queryset._embed_parent[0].split("__"):
                 prefix = f"{prefix}__{part}" if prefix else part
                 new_result = getattr(new_result, part)
                 if isawaitable(new_result):
                     new_result = await new_result
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
-        if self_queryset.embed_parent[1]:
+        if self_queryset._embed_parent[1]:
             # this works also on strict models
-            object.__setattr__(new_result, self_queryset.embed_parent[1], result)
+            object.__setattr__(new_result, self_queryset._embed_parent[1], result)
         return result, new_result
 
     def _prepare_prefetches_for_rows(
@@ -297,7 +297,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             anchor_crawl_result = crawl_relationship(
                 self_queryset.model_class,
                 prefetch.from_anchor,
-                embed_parent=self_queryset.embed_parent_filters,
+                embed_parent=self_queryset._embed_parent_filters,
                 model_database=self_queryset.database,
                 # allow_crossing_db=True,
                 traverse_last=True,
@@ -407,11 +407,11 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
         queryset._prefetch_related = [*self_queryset._prefetch_related, *prefetch]
         select_pathes: set[str] = set()
         # this one extra doesn't matter much from performance perspective, is maybe even cheaper
-        if queryset.embed_parent and queryset.embed_parent[0]:
+        if queryset._embed_parent and queryset._embed_parent[0]:
             # can be cross db, so only add the first expanded part
             crawl_result = crawl_relationship(
                 queryset.model_class,
-                queryset.embed_parent[0],
+                queryset._embed_parent[0],
                 model_database=queryset.database,
                 traverse_last=True,
             )
@@ -449,13 +449,13 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
         """
         self_queryset = cast("QuerySet[EdgyModel, EdgyEmbedTarget]", self)
         queryset = self_queryset._clone()
-        queryset.embed_parent = embed_parent
+        queryset._embed_parent = embed_parent
         select_pathes: set[str] = set()
-        if queryset.embed_parent and queryset.embed_parent[0]:
+        if queryset._embed_parent and queryset._embed_parent[0]:
             # can be cross db, so only add the first expanded part
             crawl_result = crawl_relationship(
                 queryset.model_class,
-                queryset.embed_parent[0],
+                queryset._embed_parent[0],
                 model_database=queryset.database,
                 traverse_last=True,
             )

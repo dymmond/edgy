@@ -340,7 +340,7 @@ def _calculate_select_related(queryset: QuerySetType, *, kwargs: dict[str, Any])
     cleaned_kwargs = clean_query_kwargs(
         queryset.model_class,
         kwargs,
-        queryset.embed_parent_filters,
+        queryset._embed_parent_filters,
         model_database=queryset.database,
     )
     # Iterate through the cleaned kwargs to identify relationship paths.
@@ -524,7 +524,7 @@ class _EnhancedClausesHelper:
             cleaned_kwargs = clean_query_kwargs(
                 queryset.model_class,
                 kwargs,
-                queryset.embed_parent_filters,
+                queryset._embed_parent_filters,
                 model_database=queryset.database,
             )
 

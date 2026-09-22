@@ -82,7 +82,7 @@ class CombinedQuerySet(QuerySet):
         crawl_result = clauses_mod.clean_path_to_crawl_result(
             self.model_class,
             path=distinct_on,
-            embed_parent=self.embed_parent_filters,
+            embed_parent=self._embed_parent_filters,
             model_database=self.database,
         )
         # The subquery is aliased as "edgy_combined", which is in tables_and_models[""]
@@ -118,8 +118,8 @@ class CombinedQuerySet(QuerySet):
         queryset._only = set(self._only)
         queryset._defer = set(self._defer)
 
-        queryset.embed_parent = self.embed_parent
-        queryset.embed_parent_filters = self.embed_parent_filters
+        queryset._embed_parent = self._embed_parent
+        queryset._embed_parent_filters = self._embed_parent_filters
         queryset.using_schema = self.using_schema
         queryset.active_schema = self.active_schema
 

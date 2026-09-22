@@ -27,6 +27,8 @@
 - `select_related` has now a sparse mode, which will become the default in future. It doesn't select all columns on the intermediate paths but only the ones required for traversal.
 - Unpacking `RelationshipCrawlResult` like a tuple is deprecated now. Access attributes directly.
 - When querying selected instances are proxy models and may not contain every value (except when selected). This disallows checks like `isinstance(user, User)`. Replace it with `user.get_real_class() is User`.
+- Make `embed_parent` and and `embed_parent_filters` internal (prefixed with `_`).
+- Remove `embed_parent` from QuerySet `__init__`. We need `update_embed_parent` to generate the selects, so this won't work anymore or lead to hard to debug bugs.
 
 ### Fixed
 

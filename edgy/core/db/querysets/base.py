@@ -87,7 +87,6 @@ class BaseQuerySet(
         only: Iterable[str] = _empty_set,
         defer_fields: Sequence[str] | None = None,
         defer: Iterable[str] = _empty_set,
-        embed_parent: tuple[str, str | str] | None = None,
         using_schema: str | None | Any = Undefined,
         table: sqlalchemy.Table | None = None,
         exclude_secrets: bool = False,
@@ -147,8 +146,8 @@ class BaseQuerySet(
             )
             defer = defer_fields
         self._defer = set(defer)
-        self.embed_parent = embed_parent
-        self.embed_parent_filters: tuple[str, str | str] | None = None
+        self._embed_parent: tuple[str, str | str] | None = None
+        self._embed_parent_filters: tuple[str, str | str] | None = None
         self.using_schema = using_schema
         self._extra_select = list(extra_select) if extra_select is not None else []
         self._reference_select = (
@@ -189,7 +188,6 @@ class BaseQuerySet(
             distinct=self.distinct_on,
             only=self._only,
             defer=self._defer,
-            embed_parent=self.embed_parent,
             using_schema=self.using_schema,
             table=getattr(self, "_table", None),
             exclude_secrets=self._exclude_secrets,
@@ -197,7 +195,8 @@ class BaseQuerySet(
             extra_select=self._extra_select,
         )
         queryset.or_clauses.extend(self.or_clauses)
-        queryset.embed_parent_filters = self.embed_parent_filters
+        queryset._embed_parent = self._embed_parent
+        queryset._embed_parent_filters = self._embed_parent_filters
         queryset._select_related.update(self._select_related)
         queryset._select_related_g_and_o.update(self._select_related_g_and_o)
         queryset._select_related_embedding.update(self._select_related_embedding)
@@ -303,7 +302,7 @@ class BaseQuerySet(
         clauses = []
         select_related: set[str] = set()
         cleaned_kwargs = clauses_mod.clean_query_kwargs(
-            self.model_class, kwargs, self.embed_parent_filters, model_database=self.database
+            self.model_class, kwargs, self._embed_parent_filters, model_database=self.database
         )
 
         for key, value in cleaned_kwargs.items():
@@ -372,7 +371,7 @@ class BaseQuerySet(
         crawl_result = clauses_mod.clean_path_to_crawl_result(
             self.model_class,
             path=order_by,
-            embed_parent=self.embed_parent_filters,
+            embed_parent=self._embed_parent_filters,
             model_database=self.database,
         )
         order_col = tables_and_models[crawl_result.forward_path][0].columns[
@@ -407,7 +406,7 @@ class BaseQuerySet(
                     clauses_mod.clean_path_to_crawl_result(
                         self.model_class,
                         path=field_name,
-                        embed_parent=self.embed_parent_filters,
+                        embed_parent=self._embed_parent_filters,
                         model_database=self.database,
                     ).forward_path
                 )
@@ -440,7 +439,7 @@ class BaseQuerySet(
             crawl_result = clauses_mod.clean_path_to_crawl_result(
                 self.model_class,
                 path=path,
-                embed_parent=self.embed_parent_filters,
+                embed_parent=self._embed_parent_filters,
                 model_database=self.database,
             )
             related_element = (
@@ -465,7 +464,7 @@ class BaseQuerySet(
         crawl_result = clauses_mod.clean_path_to_crawl_result(
             self.model_class,
             path=distinct_on,
-            embed_parent=self.embed_parent_filters,
+            embed_parent=self._embed_parent_filters,
             model_database=self.database,
         )
         return tables_and_models[crawl_result.forward_path][0].columns[crawl_result.field_name]

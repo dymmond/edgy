@@ -150,7 +150,7 @@ class QueryCompiler:
         if (
             prefix
             and prefix not in qs._select_related
-            and (not self.queryset.embed_parent or prefix != self.queryset.embed_parent[0])
+            and (not self.queryset._embed_parent or prefix != self.queryset._embed_parent[0])
         ):
             # not selected, leftovers from order by, group by.
             # embedding should consumed its parts
@@ -603,7 +603,7 @@ class QueryCompiler:
         crawl_result = clauses_mod.clean_path_to_crawl_result(
             self.model_class,
             path=distinct_on,
-            embed_parent=self.queryset.embed_parent_filters,
+            embed_parent=self.queryset._embed_parent_filters,
             model_database=self.database,
         )
         return tables_and_models[crawl_result.forward_path][0].columns[crawl_result.field_name]
