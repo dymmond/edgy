@@ -20,6 +20,22 @@ class User(edgy.StrictModel):
         registry = models
 
 
+class Profile(edgy.StrictModel):
+    user = edgy.ForeignKey(User, primary_key=True)
+    name = edgy.CharField(max_length=100)
+
+    class Meta:
+        registry = models
+
+
+class Group(edgy.StrictModel):
+    users = edgy.ManyToMany(User)
+    name = edgy.CharField(max_length=100)
+
+    class Meta:
+        registry = models
+
+
 @pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
     async with database:
@@ -29,28 +45,51 @@ async def create_test_database():
             await models.drop_all()
 
 
-async def test_model_defer():
-    edgy.run_sync(
+@pytest.mark.parametrize(
+    "query_fn,single_result",
+    [
+        pytest.param(lambda group: User.query.defer("description"), False, id="direct"),
+        pytest.param(
+            lambda group: Profile.query.update_embed_parent(("user", "")).defer(
+                "user__description"
+            ),
+            True,
+            id="single",
+        ),
+        pytest.param(lambda group: group.users.defer("description"), False, id="multi"),
+    ],
+)
+async def test_queryset_defer(query_fn, single_result):
+    user1 = edgy.run_sync(
         User.query.create(name="John", language="PT", description="A simple description")
     )
-    edgy.run_sync(
+    user2 = edgy.run_sync(
         User.query.create(name="Jane", language="EN", description="Another simple description")
     )
-    users = edgy.run_sync(User.query.defer("description"))
+    edgy.run_sync(Profile.query.create(user=user1, name="A profile"))
+    group = edgy.run_sync(Group.query.create(users=[user1, user2], name="A group"))
+    users = edgy.run_sync(query_fn(group))
 
-    assert len(users) == 2
+    assert len(users) == (1 if single_result else 2)
     assert users[0].model_dump() == {"id": 1, "name": "John", "language": "PT"}
 
+    assert "description" not in users[0].model_dump()
+    if not single_result:
+        assert "description" not in users[1].model_dump()
+
     users[0].description  # noqa
-    users[1].description  # noqa
+    if not single_result:
+        users[1].description  # noqa
 
     assert "description" in users[0].model_dump()
-    assert "description" in users[1].model_dump()
+    if not single_result:
+        assert "description" in users[1].model_dump()
 
-    users = await User.query.defer("description")
+    users = edgy.run_sync(query_fn(group))
 
     assert "description" not in users[0].model_dump()
-    assert "description" not in users[1].model_dump()
+    if not single_result:
+        assert "description" not in users[1].model_dump()
 
 
 async def test_model_defer_attribute_error():

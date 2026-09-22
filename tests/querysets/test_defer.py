@@ -20,6 +20,22 @@ class User(edgy.StrictModel):
         registry = models
 
 
+class Profile(edgy.StrictModel):
+    user = edgy.ForeignKey(User, primary_key=True)
+    name = edgy.CharField(max_length=100)
+
+    class Meta:
+        registry = models
+
+
+class Group(edgy.StrictModel):
+    users = edgy.ManyToMany(User)
+    name = edgy.CharField(max_length=100)
+
+    class Meta:
+        registry = models
+
+
 @pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
     async with database:
@@ -29,30 +45,52 @@ async def create_test_database():
             await models.drop_all()
 
 
-async def test_model_defer():
-    await User.query.create(name="John", language="PT", description="A simple description")
-    await User.query.create(name="Jane", language="EN", description="Another simple description")
-    users = await User.query.defer("description")
+@pytest.mark.parametrize(
+    "query_fn,single_result",
+    [
+        pytest.param(lambda group: User.query.defer("description"), False, id="direct"),
+        pytest.param(
+            lambda group: Profile.query.update_embed_parent(("user", "")).defer(
+                "user__description"
+            ),
+            True,
+            id="single",
+        ),
+        pytest.param(lambda group: group.users.defer("description"), False, id="multi"),
+    ],
+)
+async def test_queryset_defer(query_fn, single_result):
+    user1 = await User.query.create(name="John", language="PT", description="A simple description")
+    user2 = await User.query.create(
+        name="Jane", language="EN", description="Another simple description"
+    )
+    await Profile.query.create(user=user1, name="A profile")
+    group = await Group.query.create(users=[user1, user2], name="A group")
+    users = await query_fn(group)
 
-    assert len(users) == 2
+    assert len(users) == (1 if single_result else 2)
     assert users[0].model_dump() == {"id": 1, "name": "John", "language": "PT"}
 
     assert "description" not in users[0].model_dump()
-    assert "description" not in users[1].model_dump()
+    if not single_result:
+        assert "description" not in users[1].model_dump()
 
     users[0].description  # noqa
-    users[1].description  # noqa
+    if not single_result:
+        users[1].description  # noqa
 
     assert "description" in users[0].model_dump()
-    assert "description" in users[1].model_dump()
+    if not single_result:
+        assert "description" in users[1].model_dump()
 
-    users = await User.query.defer("description")
+    users = await query_fn(group)
 
     assert "description" not in users[0].model_dump()
-    assert "description" not in users[1].model_dump()
+    if not single_result:
+        assert "description" not in users[1].model_dump()
 
 
-async def test_model_defer_attribute_error():
+async def test_queryset_defer_attribute_error():
     john = await User.query.create(name="John", language="PT")
     users = await User.query.defer("name", "language", "description")
 
@@ -62,7 +100,7 @@ async def test_model_defer_attribute_error():
     assert "description" not in john.model_dump()
 
 
-async def test_model_defer_with_all():
+async def test_queryset_defer_with_all():
     await User.query.create(name="John", language="PT")
     await User.query.create(name="Jane", language="EN", description="Another simple description")
 
@@ -71,7 +109,7 @@ async def test_model_defer_with_all():
     assert len(users) == 2
 
 
-async def test_model_defer_with_filter():
+async def test_queryset_defer_with_filter():
     await User.query.create(name="John", language="PT")
     await User.query.create(name="Jane", language="EN", description="Another simple description")
 
@@ -92,7 +130,7 @@ async def test_model_defer_with_filter():
     assert len(users) == 0
 
 
-async def test_model_defer_with_exclude():
+async def test_queryset_defer_with_exclude():
     await User.query.create(name="John", language="PT")
     await User.query.create(name="Jane", language="EN", description="Another simple description")
 
@@ -109,7 +147,7 @@ async def test_model_defer_with_exclude():
     assert len(users) == 0
 
 
-async def test_model_defer_save():
+async def test_queryset_defer_save():
     await User.query.create(name="John", language="PT")
     user = await User.query.filter(pk=1).defer("name", "language").get()
     user.name = "Edgy"
@@ -124,7 +162,7 @@ async def test_model_defer_save():
     assert user.language == "EN"
 
 
-async def test_model_defer_save_without_nullable_field():
+async def test_queryset_defer_save_without_nullable_field():
     user = await User.query.create(name="John", language="PT", description="John")
 
     assert user.description == "John"
