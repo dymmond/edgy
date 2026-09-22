@@ -48,7 +48,8 @@
 
 - `crawl_relationship` returns now not `exact` as `operator`, when no operator was found but an empty string.
 - `select_related` intermediate paths will not be fully selected anymore by default in future.
-  In the new sparse mode only the relevant columns for traversing are selected. It will become the default in future.
+  In the new sparse mode only the relevant columns for traversing, embed_parent selected and with `select_related` models
+are fully selected. It will become the default in future.
   A DeprecationWarning will be issued if you are affected.
   Upgrade `select_related("company__user")` to `select_related("company","company__user")` or use the keyword `sparse=False`.
 - When querying selected instances are proxy models and may not contain every value (except when selected). This disallows checks like `isinstance(user, User)`. Replace it with `user.get_real_class() is User`.

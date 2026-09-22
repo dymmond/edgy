@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import sqlalchemy
 
@@ -14,6 +14,7 @@ from . import clauses as clauses_mod
 from .types import tables_and_models_type
 
 if TYPE_CHECKING:  # pragma: no cover
+    from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
     from edgy.core.db.models.types import BaseModelType
     from edgy.core.db.querysets.base import BaseQuerySet
 
@@ -408,7 +409,7 @@ class QueryCompiler:
                     foreign_key: BaseForeignKey = field
                     reverse = False
                 else:
-                    foreign_key = model_class.meta.fields[reverse_part]
+                    foreign_key = cast("BaseForeignKey", model_class.meta.fields[reverse_part])
                     reverse = True
 
                 if foreign_key.is_cross_db(model_database):
@@ -426,22 +427,29 @@ class QueryCompiler:
                     f"{_select_prefix}__{field_name}" if _select_prefix else f"{field_name}"
                 )
 
-                if foreign_key.is_m2m and foreign_key.embed_through != "":
-                    model_class = foreign_key.through
-                    if foreign_key.embed_through is False:
-                        injected_prefix = True
-                    else:
-                        injected_prefix = f"{prefix}__{foreign_key.embed_through}"
-                    if reverse:
-                        select_path = f"{foreign_key.from_foreign_key}__{select_path}"
-                    else:
-                        select_path = f"{foreign_key.to_foreign_key}__{select_path}"
-                    select_path = select_path.removesuffix("__")
-                    if reverse:
-                        foreign_key = model_class.meta.fields[foreign_key.to_foreign_key]
-                    else:
-                        foreign_key = model_class.meta.fields[foreign_key.from_foreign_key]
-                        reverse = True
+                if foreign_key.is_m2m:
+                    manyfield = cast("BaseManyToManyForeignKeyField", foreign_key)
+                    if manyfield.embed_through != "":
+                        model_class = cast("type[BaseModelType]", manyfield.through)
+                        if manyfield.embed_through is False:
+                            injected_prefix = True
+                        else:
+                            injected_prefix = f"{prefix}__{manyfield.embed_through}"
+                        if reverse:
+                            select_path = f"{manyfield.from_foreign_key}__{select_path}"
+                        else:
+                            select_path = f"{manyfield.to_foreign_key}__{select_path}"
+                        select_path = select_path.removesuffix("__")
+                        if reverse:
+                            foreign_key = cast(
+                                "BaseForeignKey", model_class.meta.fields[manyfield.to_foreign_key]
+                            )
+                        else:
+                            foreign_key = cast(
+                                "BaseForeignKey",
+                                model_class.meta.fields[manyfield.from_foreign_key],
+                            )
+                            reverse = True
 
                 if _select_prefix in _select_tables_and_models:
                     table: Any = _select_tables_and_models[_select_prefix][0]

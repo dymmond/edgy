@@ -712,7 +712,7 @@ class RelationshipField(BaseField):
     relationships and checking cross-database connections.
     """
 
-    def traverse_field(self, path: str) -> tuple[Any, str, str]:
+    def traverse_field(self, path: str) -> tuple[type[BaseModelType], str, str]:
         """
         Abstract method to traverse a relationship path.
 

@@ -60,7 +60,7 @@ class ModelRowMixin:
         row: Row,
         queryset: QuerySet,
         tables_and_models: dict[str, tuple[Table, type[BaseModelType]]],
-        select_related: set[str] | None = None,
+        select_related: set[str],
         prefix: str = "",
         old_select_related_value: Model | None = None,
         reference_select: reference_select_type | None = None,
@@ -80,7 +80,7 @@ class ModelRowMixin:
             tables_and_models (dict[str, tuple[Table, type[BaseModelType]]]): A dictionary
                 mapping prefixes to tuples of SQLAlchemy Table objects and Edgy Model types,
                 representing the tables and models involved in the query.
-            select_related (Sequence[Any] | None): An optional sequence of relationship
+            select_related (set[str]): An optional sequence of relationship
                 names to eager-load. These relationships will be joined in the main query.
             prefix (str): An optional prefix used for columns in the row mapping,
                 typically for joined tables in `select_related`.
@@ -104,8 +104,6 @@ class ModelRowMixin:
             reference_select if reference_select is not None else {}
         )
         model_kwargs: dict[str, Any] = {}  # Dictionary to store the model's attributes.
-        select_related = select_related or set()
-
         # Process select_related relationships.
         for related in select_related:
             field_name = related.split("__", 1)[0]
@@ -143,8 +141,9 @@ class ModelRowMixin:
                 # Recursively call from_sqla_row for nested select_related.
                 model_kwargs[field_name] = await model_class.from_sqla_row(
                     row=row,
+                    queryset=queryset,
                     tables_and_models=tables_and_models,
-                    select_related=[remainder],
+                    select_related={remainder},
                     prefix=_prefix,
                     old_select_related_value=model_kwargs.get(field_name),
                     reference_select=reference_select_sub,
@@ -153,15 +152,17 @@ class ModelRowMixin:
                 # Call from_sqla_row for the direct related model.
                 model_kwargs[field_name] = await model_class.from_sqla_row(
                     row=row,
+                    queryset=queryset,
                     tables_and_models=tables_and_models,
+                    select_related=set(),
                     prefix=_prefix,
                     old_select_related_value=model_kwargs.get(field_name),
                     reference_select=reference_select_sub,
                 )
 
-        # If an `old_select_related_value` (an existing model instance) is provided,
+        # If an `old_select_related_value` (an existing model instance from a former select_related piece) is provided,
         # update its attributes with the newly populated `item` and return it.
-        if old_select_related_value:
+        if old_select_related_value is not None:
             for k, v in model_kwargs.items():
                 object.__setattr__(old_select_related_value, k, v)
             return old_select_related_value
@@ -249,13 +250,14 @@ class ModelRowMixin:
         # Populate the regular column values for the main model.
         class_columns = cls.table.columns
         for column in table_columns:
+            field_name = cls.meta.columns_to_field.get(column.key, column.key)
             # Skip if only_fields is specified and the column is not in it.
             if (
                 queryset._only
                 # don't exclude primary keys, no matter if in only_fields or not
                 and not column.primary_key
                 and prefix not in queryset._only
-                and (f"{prefix}__{column.key}" if prefix else column.key) not in queryset._only
+                and (f"{prefix}__{field_name}" if prefix else field_name) not in queryset._only
             ):
                 continue
             if (
@@ -291,16 +293,29 @@ class ModelRowMixin:
                     )
             # Overwrite existing item with the value from reference_select.
             model_kwargs[reference_target_main] = row._mapping[reference_source_main]
+        is_defer = False
+        if queryset._defer:
+            # check if any direct field is affected
+            is_defer = any(
+                "__" not in x.removeprefix(prefix).removeprefix("__") for x in queryset._defer
+            )
 
         # Instantiate the model (either as a proxy or a full model).
         model: Model = (
             cls.proxy_model(**model_kwargs, __phase__="init_db")
             # when prefix, embedding could also be in use and lead to partial models
             if (
-                queryset._defer
+                is_defer
                 or (queryset._exclude_secrets and cls.meta.secret_fields)
                 or (queryset._only and prefix not in queryset._only)
-                or (prefix and prefix not in queryset._select_related)
+                or (
+                    prefix
+                    and (
+                        prefix not in queryset._select_related
+                        # embed parent should be fully loaded
+                        or (queryset._embed_parent and queryset._embed_parent[0] == prefix)
+                    )
+                )
             )
             else cls(**model_kwargs, __phase__="init_db")
         )

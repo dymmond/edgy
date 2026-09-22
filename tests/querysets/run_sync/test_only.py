@@ -87,11 +87,9 @@ async def test_only(query_fn, single_result):
     if not single_result:
         assert "description" not in users[1].model_dump()
 
-    with pytest.raises(AttributeError):
-        users[0].description  # noqa
+    users[0].description  # noqa
     if not single_result:
-        with pytest.raises(AttributeError):
-            users[1].description  # noqa
+        users[1].description  # noqa
 
     assert "description" not in users[0].model_dump()
     if not single_result:

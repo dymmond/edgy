@@ -10,7 +10,9 @@ from edgy.core.db.datastructures import QueryModelResultCache
 from .types import EdgyEmbedTarget, EdgyModel, tables_and_models_type
 
 if TYPE_CHECKING:  # pragma: no cover
+    from edgy.core.db.models.model import Model
     from edgy.core.db.querysets.base import BaseQuerySet
+    from edgy.core.db.querysets.queryset import QuerySet
 
 
 class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
@@ -24,10 +26,9 @@ class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
         queryset: BaseQuerySet[EdgyModel, EdgyEmbedTarget],
         tables_and_models: tables_and_models_type,
     ) -> None:
-        self.queryset = queryset
-        self.model_class = queryset.model_class
+        self.queryset = cast("QuerySet[EdgyModel, EdgyEmbedTarget]", queryset)
+        self.model_class = cast("type[Model]", queryset.model_class)
         self.tables_and_models = tables_and_models
-        self.is_defer_fields = bool(self.queryset._defer)
 
     async def _row_to_model_uncached(
         self,
@@ -40,6 +41,7 @@ class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
             "EdgyModel",
             await self.model_class.from_sqla_row(
                 row=row,
+                queryset=self.queryset,
                 tables_and_models=self.tables_and_models,
                 select_related=self.queryset._select_related.union(
                     self.queryset._select_related_embedding
@@ -106,6 +108,7 @@ class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
             batch,
             cache_fn=lambda row: self.model_class.from_sqla_row(
                 row=row,
+                queryset=self.queryset,
                 tables_and_models=self.tables_and_models,
                 select_related=self.queryset._select_related.union(
                     self.queryset._select_related_embedding
