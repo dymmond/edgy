@@ -660,13 +660,12 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         The primary key is automatically included to ensure object identity and saving functionality.
 
         Args:
-            *fields: The names of the model fields (columns) to include in the SELECT statement.
+            *fields: The names of the model fields and columns to include in the SELECT statement.
 
         Returns:
             A new QuerySet clone with the `_only` set attribute containing the selected fields.
         """
         queryset: QuerySet = self._clone()
-        # primary keys are readded in compiler
         queryset._update_related_weak(fields, cache_name="_only", clear=True)
         return queryset
 

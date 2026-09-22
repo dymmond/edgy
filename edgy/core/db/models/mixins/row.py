@@ -116,7 +116,9 @@ class ModelRowMixin:
 
             if isinstance(field, RelationshipField):
                 # Traverse the field to get the related model class and any remaining path.
-                model_class, _, remainder = field.traverse_field(related)
+                model_class, _, remainder = cast(
+                    "tuple[type[Model], str, str]", field.traverse_field(related)
+                )
             else:
                 raise QuerySetError(
                     detail=f'Selected field "{field_name}" is not a RelationshipField on {cls}.'
@@ -132,11 +134,6 @@ class ModelRowMixin:
             ):
                 continue
 
-            # Get the nested reference_select for the current related field.
-            reference_select_sub = _reference_select.get(field_name)
-            if not isinstance(reference_select_sub, dict):
-                reference_select_sub = {}
-
             if remainder:
                 # Recursively call from_sqla_row for nested select_related.
                 model_kwargs[field_name] = await model_class.from_sqla_row(
@@ -146,7 +143,9 @@ class ModelRowMixin:
                     select_related={remainder},
                     prefix=_prefix,
                     old_select_related_value=model_kwargs.get(field_name),
-                    reference_select=reference_select_sub,
+                    reference_select=cast(
+                        "reference_select_type | None", _reference_select.get(field_name)
+                    ),
                 )
             else:
                 # Call from_sqla_row for the direct related model.
@@ -157,7 +156,9 @@ class ModelRowMixin:
                     select_related=set(),
                     prefix=_prefix,
                     old_select_related_value=model_kwargs.get(field_name),
-                    reference_select=reference_select_sub,
+                    reference_select=cast(
+                        "reference_select_type | None", _reference_select.get(field_name)
+                    ),
                 )
 
         # If an `old_select_related_value` (an existing model instance from a former select_related piece) is provided,
@@ -250,19 +251,10 @@ class ModelRowMixin:
         # Populate the regular column values for the main model.
         class_columns = cls.table.columns
         for column in table_columns:
+            # only is already applied in compiler
             field_name = cls.meta.columns_to_field.get(column.key, column.key)
-            # Skip if only_fields is specified and the column is not in it.
             if (
-                queryset._only
-                # don't exclude primary keys, no matter if in only_fields or not
-                and not column.primary_key
-                and prefix not in queryset._only
-                and (f"{prefix}__{field_name}" if prefix else field_name) not in queryset._only
-            ):
-                continue
-            if (
-                queryset._exclude_secrets
-                and cls.meta.columns_to_field.get(column.key) in cls.meta.secret_fields
+                queryset._exclude_secrets and field_name in cls.meta.secret_fields
             ):  # Skip if the column is a secret.
                 continue
             if column.key not in class_columns:  # Skip if the column is not part of the model.
@@ -296,9 +288,19 @@ class ModelRowMixin:
         is_defer = False
         if queryset._defer:
             # check if any direct field is affected
-            is_defer = any(
-                "__" not in x.removeprefix(prefix).removeprefix("__") for x in queryset._defer
-            )
+            if prefix:
+                is_defer = any(
+                    # check for non-root defer paths
+                    "__" not in x.removeprefix(prefix).removeprefix("__")
+                    for x in queryset._defer
+                    if "__" in x
+                )
+            else:
+                is_defer = any(
+                    # check for root defer paths
+                    "__" not in x
+                    for x in queryset._defer
+                )
 
         # Instantiate the model (either as a proxy or a full model).
         model: Model = (
@@ -310,11 +312,9 @@ class ModelRowMixin:
                 or (queryset._only and prefix not in queryset._only)
                 or (
                     prefix
-                    and (
-                        prefix not in queryset._select_related
-                        # embed parent should be fully loaded
-                        or (queryset._embed_parent and queryset._embed_parent[0] == prefix)
-                    )
+                    and prefix not in queryset._select_related
+                    # embed parent should be fully loaded, and we need to invert
+                    and not (queryset._embed_parent and queryset._embed_parent[0] == prefix)
                 )
             )
             else cls(**model_kwargs, __phase__="init_db")

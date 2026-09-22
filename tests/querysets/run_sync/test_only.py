@@ -83,7 +83,6 @@ async def test_only(query_fn, single_result):
     assert len(users) == (1 if single_result else 2)
     assert users[0].model_dump() == {"id": 1, "name": "John", "language": "PT"}
 
-    assert "description" not in users[0].model_dump()
     if not single_result:
         assert "description" not in users[1].model_dump()
 
@@ -91,9 +90,9 @@ async def test_only(query_fn, single_result):
     if not single_result:
         users[1].description  # noqa
 
-    assert "description" not in users[0].model_dump()
+    assert "description" in users[0].model_dump()
     if not single_result:
-        assert "description" not in users[1].model_dump()
+        assert "description" in users[1].model_dump()
 
     users = edgy.run_sync(query_fn(group))
 

@@ -83,10 +83,6 @@ async def test_only(query_fn, single_result):
     if not single_result:
         assert "description" not in users[1].model_dump()
 
-    assert "description" not in users[0].model_dump()
-    if not single_result:
-        assert "description" not in users[1].model_dump()
-
     users[0].description  # noqa
     if not single_result:
         users[1].description  # noqa

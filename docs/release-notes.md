@@ -21,14 +21,14 @@
 - Assign prefetches from queryset not in `from_sqla_row`. This allows better handling of embeddings.
 - `create_model_key_from_sqla_row` is deprecated now. Use the more generalized `create_model_key_from_raw_mapping` for the row mapping (`row._mapping`) instead.
 - Move `get_table_key_or_name` to `edgy.core.utils.db`.
-- Add embedded path implicit to select_related paths.
+- Add embedded path part of source db implicit to select_related paths.
 - `crawl_relationship` has now a better error when a field does not exist.
 - Unpacking and accessing `CrawlResult` (the result of `crawl_relationship`) is now deprecated. Use the results attributes instead.
 - `select_related` has now a sparse mode, which will become the default in future. It doesn't select all columns on the intermediate paths but only the ones required for traversal.
 - Unpacking `RelationshipCrawlResult` like a tuple is deprecated now. Access attributes directly.
-- When querying selected instances are proxy models and may not contain every value (except when selected). This disallows checks like `isinstance(user, User)`. Replace it with `user.get_real_class() is User` for maximal compatibility.
 - Make `embed_parent` and and `embed_parent_filters` internal (prefixed with `_`).
-- Remove `embed_parent` from QuerySet `__init__`. We need `update_embed_parent` to generate the selects, so this won't work anymore or lead to hard to debug bugs.
+- Identity checks may need an upgrade when doing the check on a non-selected path (e.g. implicitly added paths for prefetches)
+  Replace idioms `isinstance(user, User)` with `user.get_real_class() is User` for maximal compatibility.
 
 ### Fixed
 
@@ -41,15 +41,16 @@
 ### Removed
 
 - Remove long deprecated `fields` and `fields_mapping`.
-- Remove long deprecated `only_fields` and `defer_fields` from QuerySet `__init__`.
-- Remove `only`, `defer`, `embed_parent` from QuerySet `__init__`. They need internal cleanup logic which shouldn't be in `__init__`
+- Remove long deprecated `only_fields`, `defer_fields`, `distinct_on`, `limit_count`, `limit_offset` kwargs from QuerySet `__init__`.
+- Remove `only`, `defer`, `embed_parent`, `select_related` from QuerySet `__init__`. They need internal cleanup logic which shouldn't be called in `__init__` and may end in loops.
+
 
 ### Breaking
 
 - `crawl_relationship` returns now not `exact` as `operator`, when no operator was found but an empty string.
 - `select_related` intermediate paths will not be fully selected anymore by default in future.
   In the new sparse mode only the relevant columns for traversing, embed_parent selected and with `select_related` models
-are fully selected. It will become the default in future.
+  are fully selected. It will become the default in future.
   A DeprecationWarning will be issued if you are affected.
   Upgrade `select_related("company__user")` to `select_related("company","company__user")` or use the keyword `sparse=False`.
 - When querying selected instances are proxy models and may not contain every value (except when selected). This disallows checks like `isinstance(user, User)`. Replace it with `user.get_real_class() is User`.

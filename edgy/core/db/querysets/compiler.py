@@ -122,6 +122,14 @@ class QueryCompiler:
             return True
         # a bit heavy, so check it last
         if prefix:
+            # include primary keys, we need to anchor and load the update_embed target
+            if (
+                qs._prefetch_related
+                and prefix in qs._select_related_embedding
+                and column_key in model_class.pkcolumns
+            ):
+                return True
+            # retrieve the field and the parent model
             splitted = prefix.rsplit("__", 1)
             if len(splitted) == 2:
                 parent_model_path, parent_field_name = splitted
@@ -129,23 +137,16 @@ class QueryCompiler:
                 parent_model_path, parent_field_name = "", splitted[0]
             parent_model = tables_and_models[parent_model_path][1]
 
-            # include primary keys, we need to anchor
-            if (
-                qs._prefetch_related
-                and prefix in qs._select_related_embedding
-                and column_key in model_class.pkcolumns
-            ):
-                return True
             # include referenced columns, we need to resolve
             if prefix in select_embedded_parts and column_key in get_related_column_keys(
                 parent_model.meta.fields[parent_field_name]
             ):
                 return True
-
         elif column_key in model_class.pkcolumns:
             # = no prefix and column_key in model_class.pkcolumns
-            # we need the primary keys also from the main model
+            # we need the primary keys also from the root model to load
             return True
+
         ################ now rules to reject ################
 
         # Check .only() rules

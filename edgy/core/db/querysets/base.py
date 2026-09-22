@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import warnings
 from collections.abc import (
     AsyncIterator,
     Awaitable,
@@ -72,16 +71,12 @@ class BaseQuerySet(
         *,
         database: Database | None = None,
         filter_clauses: Iterable[Any] = _empty_set,
-        select_related: Iterable[str] = _empty_set,
         prefetch_related: Iterable[Prefetch] = _empty_set,
-        limit_count: int | None = None,
         limit: int | None = None,
-        limit_offset: int | None = None,
         offset: int | None = None,
         batch_size: int | None = None,
         order_by: Iterable[str] = _empty_set,
         group_by: Iterable[str] = _empty_set,
-        distinct_on: None | Literal[True] | Iterable[str] = None,
         distinct: None | Literal[True] | Iterable[str] = None,
         using_schema: str | None | Any = Undefined,
         table: sqlalchemy.Table | None = None,
@@ -97,35 +92,17 @@ class BaseQuerySet(
         self.filter_clauses: list[Any] = list(filter_clauses)
         self.or_clauses: list[Any] = []
         self._aliases: dict[str, sqlalchemy.Alias] = {}
-        if limit_count is not None:
-            warnings.warn(
-                "`limit_count` is deprecated use `limit`", DeprecationWarning, stacklevel=2
-            )
-            limit = limit_count
         self.limit_count = limit
-        if limit_offset is not None:
-            warnings.warn(
-                "`limit_offset` is deprecated use `limit`", DeprecationWarning, stacklevel=2
-            )
-            offset = limit_offset
         self._offset = offset
-        select_related = set(select_related)
         self._select_related: set[str] = set()
         # groups and order by
         self._select_related_g_and_o: set[str] = set()
         # embedded, like embed_parent or prefetches
         self._select_related_embedding: set[str] = set()
-        if select_related:
-            self._update_select_related(select_related)
         self._prefetch_related = list(prefetch_related)
         self._batch_size = batch_size
         self._order_by: tuple[str, ...] = tuple(order_by)
         self._group_by: tuple[str, ...] = tuple(group_by)
-        if distinct_on is not None:
-            warnings.warn(
-                "`distinct_on` is deprecated use `distinct`", DeprecationWarning, stacklevel=2
-            )
-            distinct = distinct_on
 
         if distinct is True:
             distinct = _empty_set
