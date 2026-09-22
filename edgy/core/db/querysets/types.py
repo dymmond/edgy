@@ -373,13 +373,19 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         ...
 
     @abstractmethod
-    def select_related(self, *related: str) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
+    def select_related(
+        self, *related: str, sparse: bool = False
+    ) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
         """
         Abstract method to perform an eager load of related objects using SQL JOINs.
 
         Args:
             *related (str): Relationship names to eager load. Supports '__' for nested relationships.
-
+        Kwargs:
+            sparse (bool): Shall only retrieve the for traversal neccessary columns of intermediate path parts
+                           (new behavior)?
+                           If `False` we retrieve the full columns of intermediate path parts like before.
+                           Defaults currently to `False` but will switch to `True` in future.
         Returns:
             QuerySetType: A new QuerySet instance with eager loading configured.
         """

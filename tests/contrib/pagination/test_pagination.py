@@ -75,9 +75,31 @@ async def test_pagination_tricky():
     page = await paginator.get_page()
     assert page.content[0].cursor2 == 0.0
 
+
+async def test_pagination_error_direct():
     with pytest.raises(KeyError):
         await CursorPaginator(
             CounterTricky.query.order_by("non_exist"),
+            page_size=30,
+            next_item_attr="next",
+            previous_item_attr="prev",
+        ).get_page()
+
+
+async def test_pagination_error_non_exist_relation():
+    with pytest.raises(ValueError):
+        await CursorPaginator(
+            CounterTricky.query.order_by("non_exist__foo"),
+            page_size=30,
+            next_item_attr="next",
+            previous_item_attr="prev",
+        ).get_page()
+
+
+async def test_pagination_traverse_existing_field():
+    with pytest.raises(ValueError):
+        await CursorPaginator(
+            CounterTricky.query.order_by("cursor__foo"),
             page_size=30,
             next_item_attr="next",
             previous_item_attr="prev",

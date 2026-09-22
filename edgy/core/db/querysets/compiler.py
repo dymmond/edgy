@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 import sqlalchemy
 
 from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
-from edgy.core.db.relationships.utils import crawl_relationship
+from edgy.core.db.relationships.utils import get_related_column_keys
 from edgy.core.utils.db import get_table_key_or_name, hash_tablekey
 from edgy.exceptions import QuerySetError
 
@@ -89,37 +89,76 @@ class QueryCompiler:
 
     def _should_include_column(
         self,
+        tables_and_models: tables_and_models_type,
         field_name: str,
+        column_key: str,
         model_class: type[BaseModelType],
-        prefix: str = "",
+        prefix: str,
+        select_embedded_parts: set[str],
     ) -> bool:
         """
         Helper method to check if a column should be included based on
         .only(), .defer(), and .exclude_secrets() rules.
 
-        Args:
-            field_name: The name of the model field.
+        Args:,
+            tables_and_models: The table/model mapping from `join_graph_data`.
+            field_name: The name of the model field or column key (when not available).
+            column_key: The key of the column.
             model_class: The model class that owns the field.
             prefix: The join prefix (e.g., "related_model").
+            select_embedded_parts: Select pathes deconstructed into single parts.
 
         Returns:
             True if the column should be included, False otherwise.
         """
         qs = self.queryset
+        full_field_name = f"{prefix}__{field_name}" if prefix else field_name
+        # allow all elements of the select path
+        if full_field_name in select_embedded_parts:
+            return True
+        # order and group fields must be in the select set
+        if full_field_name in self.queryset._select_related_g_and_o:
+            return True
+        # a bit heavy, so check it last
+        if prefix:
+            splitted = prefix.rsplit("__", 1)
+            if len(splitted) == 2:
+                parent_model_path, parent_field_name = splitted
+            else:
+                parent_model_path, parent_field_name = "", splitted[0]
+            parent_model = tables_and_models[parent_model_path][1]
+
+            # include primary keys, we need to anchor
+            if (
+                qs._prefetch_related
+                and prefix in qs._select_related_embedding
+                and column_key in model_class.pkcolumns
+            ):
+                return True
+            # include referenced columns, we need to resolve
+            if prefix in select_embedded_parts and column_key in get_related_column_keys(
+                parent_model.meta.fields[parent_field_name]
+            ):
+                return True
+        ################ now rules to reject ################
 
         # Check .only() rules
-        if qs._only:
-            if not prefix and field_name not in qs._only:
-                return False
-            if prefix and prefix not in qs._only and f"{prefix}__{field_name}" not in qs._only:
-                return False
+        if qs._only and not (full_field_name in qs._only or (prefix and prefix in qs._only)):
+            return False
+
+        # Check that the prefix is also in select_related and not in embedded endpoints
+        if (
+            prefix
+            and prefix not in qs._select_related
+            and (not self.queryset.embed_parent or prefix != self.queryset.embed_parent[0])
+        ):
+            # not selected, leftovers from order by, group by.
+            # embedding should consumed its parts
+            return False
 
         # Check .defer() rules
-        if qs._defer:
-            if not prefix and field_name in qs._defer:
-                return False
-            if prefix and (prefix in qs._defer or f"{prefix}__{field_name}" in qs._defer):
-                return False
+        if qs._defer and full_field_name in qs._defer:
+            return False
 
         # Check .exclude_secrets() rules
         if (  # noqa
@@ -129,7 +168,7 @@ class QueryCompiler:
         ):
             return False
 
-        # If no rules excluded it, include it
+        ############### default action: select ###############
         return True
 
     def _build_columns(self, tables_and_models: tables_and_models_type) -> list[Any]:
@@ -147,13 +186,27 @@ class QueryCompiler:
             A list of SQLAlchemy Column objects and labeled columns.
         """
         columns_and_extra: list[Any] = [*self.queryset._extra_select]
+        select_embedded_parts: set[str] = set()
+        for path in self.queryset._select_related_embedding:
+            prefix = ""
+            for part in path.split("__"):
+                prefix = f"{prefix}__{part}" if prefix else part
+                if prefix:
+                    select_embedded_parts.add(prefix)
 
         for prefix, (table, model_class) in tables_and_models.items():
             for column_key, column in table.columns.items():
                 field_name = model_class.meta.columns_to_field.get(column_key, column_key)
 
                 # Delegate the complex logic to the helper
-                if not self._should_include_column(field_name, model_class, prefix):
+                if not self._should_include_column(
+                    tables_and_models,
+                    field_name,
+                    column_key,
+                    model_class,
+                    prefix,
+                    select_embedded_parts,
+                ):
                     continue
 
                 # Add the column, aliasing if it's from a joined table
@@ -317,13 +370,9 @@ class QueryCompiler:
         _select_tables_and_models: tables_and_models_type = {"": (select_from, self.model_class)}
         transitions: dict[tuple[str, str, str], tuple[Any, tuple[str, str, str] | None, str]] = {}
 
-        select_pathes = self.queryset._select_related.union(self.queryset._select_related_weak)
-        if self.queryset.embed_parent:
-            # implicit select the forward path of embed_parent
-            result = crawl_relationship(
-                self.queryset.model_class, self.queryset.embed_parent[0], traverse_last=True
-            )
-            select_pathes.add(result.forward_path)
+        select_pathes = self.queryset._select_related.union(
+            self.queryset._select_related_g_and_o, self.queryset._select_related_embedding
+        )
 
         for select_path in select_pathes:
             model_class = self.model_class

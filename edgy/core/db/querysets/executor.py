@@ -73,9 +73,7 @@ class QueryExecutor(Generic[EdgyModel, EdgyEmbedTarget]):
             new_cache: The result cache to populate.
 
         Yields:
-            A tuple containing:
-                - (result_tuple): The (raw_model, embed_target) tuple.
-                - (row): The raw SQLAlchemy Row.
+            result_tuple: The (raw_model, embed_target) tuple.
         """
         assert self.parser is not None, "parser not initialized"
         results: Sequence[tuple[EdgyModel, EdgyEmbedTarget]] = await self.parser.batch_to_models(

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from pydantic.json_schema import WithJsonSchema
 
@@ -93,15 +93,12 @@ class BaseContentTypeField(BaseForeignKeyField):
         if self.relation_fn is not None:
             return self.relation_fn(**kwargs)
         # Return a SingleRelation, indicating a one-to-one or many-to-one relationship.
-        return cast(
-            ManyRelationProtocol,
-            SingleRelation(
-                to=self.owner,
-                reverse_name=self.reverse_name,
-                to_foreign_key=self.name,
-                embed_parent=self.embed_parent,
-                **kwargs,
-            ),
+        return SingleRelation(
+            to=self.owner,
+            reverse_name=self.reverse_name,
+            to_foreign_key=self.name,
+            embed_parent=self.embed_parent,
+            **kwargs,
         )
 
     @cached_property

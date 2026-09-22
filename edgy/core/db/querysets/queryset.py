@@ -243,7 +243,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
         ]
         | dict[str, Any]
-        | QuerySet,
+        | QuerySetType,
         **kwargs: Any,
     ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
@@ -292,7 +292,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
         ]
         | dict[str, Any]
-        | QuerySet,
+        | QuerySetType,
         **kwargs: Any,
     ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
@@ -318,7 +318,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
         ]
         | dict[str, Any]
-        | QuerySet,
+        | QuerySetType,
         **kwargs: Any,
     ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
@@ -372,7 +372,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
         ]
         | dict[str, Any]
-        | QuerySet,
+        | QuerySetType,
         **kwargs: Any,
     ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
@@ -398,7 +398,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
         ]
         | dict[str, Any]
-        | QuerySet,
+        | QuerySetType,
         **kwargs: Any,
     ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
@@ -436,8 +436,8 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
 
     def extra_select(
         self,
-        *extra: sqlalchemy.ColumnClause,
-    ) -> QuerySetType:
+        *extra: sqlalchemy.ClauseElement,
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Adds extra columns or expressions to the SELECT statement.
 
@@ -534,8 +534,16 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         """
         queryset: QuerySet = self._clone()
         queryset._order_by = order_by
-        if queryset._update_select_related_weak(order_by, clear=True):
-            queryset._update_select_related_weak(queryset._group_by, clear=False)
+        if queryset._update_select_related_weak(
+            (x.removeprefix("-") for x in order_by),
+            cache_name="_select_related_g_and_o",
+            clear=True,
+        ):
+            queryset._update_select_related_weak(
+                queryset._group_by,
+                cache_name="_select_related_g_and_o",
+                clear=False,
+            )
         return queryset
 
     def reverse(self) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
@@ -610,8 +618,14 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         """
         queryset: QuerySet = self._clone()
         queryset._group_by = group_by
-        if queryset._update_select_related_weak(group_by, clear=True):
-            queryset._update_select_related_weak(queryset._order_by, clear=False)
+        if queryset._update_select_related_weak(
+            group_by, cache_name="_select_related_g_and_o", clear=True
+        ):
+            queryset._update_select_related_weak(
+                (x.lstrip("-") for x in queryset._order_by),
+                cache_name="_select_related_g_and_o",
+                clear=False,
+            )
         return queryset
 
     def distinct(
@@ -683,14 +697,24 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         queryset._defer = set(fields)
         return queryset
 
-    def select_related(self, *related: str) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
+    def select_related(
+        self, *related: str, sparse: bool | None = None
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Returns a QuerySet that will “follow” foreign-key relationships, selecting additional
         related-object data when it executes its query.
 
         This is a performance booster which results in a single more complex query but means
 
-        later use of foreign-key relationships won't require database queries.
+        The later use of foreign-key relationships won't require database queries.
+
+        Args:
+            *related (str): Relationship names to eager load. Supports '__' for nested relationships.
+        Kwargs:
+            sparse (bool): Shall only retrieve the for traversal neccessary columns of intermediate path parts
+                           (new behavior)?
+                           If `False` we retrieve the full columns of intermediate path parts like before.
+                           Defaults currently to `False` but will switch to `True` in future.
         """
         queryset: QuerySet = self._clone()
         if len(related) >= 1 and not isinstance(cast(Any, related[0]), str):
@@ -700,7 +724,31 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
                 stacklevel=2,
             )
             related = cast(tuple[str, ...], related[0])
-        queryset._update_select_related(related)
+        if not sparse:
+            has_split = False
+            new_related: set[str] = set()
+            # we only sort if we need to output a warning
+            paths = sorted(related, key=lambda x: x.count("__")) if sparse is None else related
+            for path in paths:
+                prefix = ""
+                for part in path.split("__"):
+                    prefix = f"{prefix}__{part}" if prefix else part
+                    if prefix not in new_related:
+                        if "__" in prefix:
+                            has_split = True
+                        new_related.add(prefix)
+            # when affected warn
+            if has_split and sparse is None:
+                warnings.warn(
+                    "`select_related` will become sparse in future. This means intermediate select path parts are not fully selected anymore "
+                    "by default. To control this behavior, provide the keyword `sparse` to select_related."
+                    "You can also add the intermediate path parts manually to the select_related for the former behavior.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+            queryset._update_select_related(new_related)
+        else:
+            queryset._update_select_related(related)
         return queryset
 
     async def values(
@@ -825,7 +873,9 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         queryset: QuerySet = self
 
         needs_distinct = (
-            bool(queryset.or_clauses) or bool(queryset._select_related) or bool(queryset._group_by)
+            bool(queryset.or_clauses)
+            or bool(queryset._select_related.union(queryset._select_related_embedding))
+            or bool(queryset._group_by)
         )
 
         base_select = await queryset.as_select()
@@ -908,6 +958,8 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         if not queryset._order_by:
             queryset = queryset.order_by(*self.model_class.pkcolumns)
         expression, tables_and_models = await queryset.as_select_with_tables()
+        # this works, because in case of no order_by, the inserted default order doesn't produce
+        # extra selections
         self._cached_select_related_expression = queryset._cached_select_related_expression
         check_db_connection(queryset.database)
         async with queryset.database as database:
@@ -934,6 +986,8 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             queryset = queryset.order_by(*self.model_class.pkcolumns)
         queryset = queryset.reverse()
         expression, tables_and_models = await queryset.as_select_with_tables()
+        # this works, because in case of no order_by, the inserted default order doesn't produce
+        # extra selections
         self._cached_select_related_expression = queryset._cached_select_related_expression
         check_db_connection(queryset.database)
         async with queryset.database as database:
@@ -994,28 +1048,6 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             CHECK_DB_CONNECTION_SILENCED.reset(token)
 
     insert = create
-
-    @overload
-    def update_embed_parent(self, embed_parent: None) -> QuerySet[EdgyModel, EdgyModel]: ...
-    @overload
-    def update_embed_parent(
-        self, embed_parent: tuple[str, str]
-    ) -> QuerySet[EdgyModel, EdgyEmbedTarget]: ...
-    def update_embed_parent(
-        self, embed_parent: tuple[str, str] | None
-    ) -> QuerySet[EdgyModel, EdgyEmbedTarget] | QuerySet[EdgyModel, EdgyModel]:
-        """
-        Update or remove (provide None) embed_parent applied on instances.
-        Note: this doesn't affect embed_parent for filters.
-
-        Args:
-            embed_parent: define the new embed_parent.
-        Returns:
-            QuerySetType: A new QuerySet instance with the new embedding.
-        """
-        queryset = self._clone()
-        queryset.embed_parent = embed_parent
-        return queryset
 
     async def delete(self, *, use_models: bool = False) -> int | None:
         """

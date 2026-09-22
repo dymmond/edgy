@@ -317,7 +317,8 @@ class ModelRowMixin:
         # Instantiate the model (either as a proxy or a full model).
         model: Model = (
             cls.proxy_model(**model_kwargs, __phase__="init_db")
-            if exclude_secrets or is_defer_fields or only_fields
+            # when prefix, embedding could also be in use and lead to partial models
+            if exclude_secrets or is_defer_fields or only_fields or prefix
             else cls(**model_kwargs, __phase__="init_db")
         )
         model._db_deleted = False

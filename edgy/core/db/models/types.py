@@ -194,7 +194,7 @@ class BaseModelType(ABC):
         self,
         *,
         force_insert: bool,
-        values: dict[str, Any] | set[str] | list[str] | None,
+        values: dict[str, Any] | set[str] | None,
     ) -> BaseModelType:
         """
         Abstract asynchronous method for saving the model instance to the database.
@@ -206,7 +206,7 @@ class BaseModelType(ABC):
             force_insert (bool): If `True`, forces an SQL INSERT operation, even if
                                  the instance might already exist (e.g., if primary key is set).
                                  Defaults to `False`.
-            values (dict[str, Any] | set[str] | list[str] | None): Optional. A dictionary of
+            values (dict[str, Any] | set[str] | None): Optional. A dictionary of
                                                                  values to save, or a set/list
                                                                  of field names to save.
                                                                  Defaults to `None`.
@@ -495,6 +495,7 @@ class BaseModelType(ABC):
         The key is composed of the model's class name and the string representation
         of its primary key column values. This key can be used for caching model
         instances to improve performance.
+        Compatible to `create_model_key_from_raw_mapping` when `allow_missing_and_none=False`.
 
         Kwargs:
             allow_missing_and_none (bool): Missing keys are replaced with `None` and `None` values are allowed.
@@ -510,6 +511,7 @@ class BaseModelType(ABC):
         """
         Builds a unique cache key for a model instance based on its class name and
         primary key values extracted from a SQLAlchemy row.
+        Compatible to `create_model_key`.
 
         Args:
             mapping (Row mapping): The SQLAlchemy row mapping from which to extract primary key values.
@@ -519,8 +521,8 @@ class BaseModelType(ABC):
         Returns:
             tuple: A tuple representing the unique key for the model instance.
         """
-        pk_key_list: list[Any] = [cls.__name__]
+        key_list: list[Any] = [cls.__name__]
         for attr in cls.pkcolumns:
             # Append the primary key value from the row to the key list.
-            pk_key_list.append(str(mapping[f"{prefix}{attr}"]))
-        return tuple(pk_key_list)
+            key_list.append(str(mapping[f"{prefix}{attr}"]))
+        return tuple(key_list)

@@ -25,16 +25,15 @@ class ContentType(edgy.Model, metaclass=ContentTypeMeta):
     name: str = edgy.fields.CharField(max_length=100, default="", index=True)
     # set also the schema for tenancy support
     schema_name: str = edgy.CharField(max_length=63, null=True, index=True)
-    # can be a hash or similar. Usefull for checking collisions cross domain
+    # can be a hash or similar. Useful for checking collisions cross domain
     collision_key: str = edgy.fields.CharField(max_length=255, null=True, unique=True)
 
     async def get_instance(self) -> edgy.Model:
         reverse_name = f"reverse_{self.name.lower()}"
-        return cast(
-            "edgy.Model",
-            await cast("QuerySet", getattr(self, reverse_name))
+        return (
+            await cast("QuerySet[edgy.Model]", getattr(self, reverse_name))
             .using(schema=self.schema_name)
-            .get(),
+            .get()
         )
 
     async def raw_delete(
