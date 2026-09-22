@@ -10,7 +10,7 @@ from collections.abc import (
     Iterable,
     Sequence,
 )
-from typing import TYPE_CHECKING, Any, Generic, Literal, ParamSpec, TypeAlias, overload
+from typing import TYPE_CHECKING, Any, Generic, Literal, ParamSpec, TypeAlias, Union, overload
 
 from edgy.types import Undefined
 
@@ -45,7 +45,7 @@ Type alias for a dictionary mapping table aliases to tuples containing a SQLAlch
 and its corresponding BaseModelType.
 """
 reference_select_type: TypeAlias = dict[
-    str, dict[str, "reference_select_type"] | str | "sqlalchemy.Column"
+    str, Union[dict[str, "reference_select_type"], str, None, "sqlalchemy.Column"]
 ]
 """
 Type alias for a dictionary representing a recursive structure used for selecting

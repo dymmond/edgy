@@ -416,11 +416,7 @@ class BaseQuerySet(
                 embed_parent=self._embed_parent_filters,
                 model_database=self.database,
             )
-            related_element = (
-                crawl_result.field_name
-                if not crawl_result.forward_path
-                else f"{crawl_result.forward_path}__{crawl_result.field_name}"
-            )
+            related_element = crawl_result.forward_path_to_field
             if crawl_result.cross_db_remainder:
                 raise QuerySetError(
                     detail=f'Selected path "{related_element}" is on another database.'

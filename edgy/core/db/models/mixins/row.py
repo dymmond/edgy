@@ -133,6 +133,11 @@ class ModelRowMixin:
                 tables_and_models[_prefix][0],
             ):
                 continue
+            # Get the nested reference_select for the current related field.
+            # It can be something different than a dict (e.g. sqla.Column or None) so sanitize
+            reference_select_sub = _reference_select.get(field_name)
+            if not isinstance(reference_select_sub, dict):
+                reference_select_sub = {}
 
             if remainder:
                 # Recursively call from_sqla_row for nested select_related.
@@ -143,9 +148,7 @@ class ModelRowMixin:
                     select_related={remainder},
                     prefix=_prefix,
                     old_select_related_value=model_kwargs.get(field_name),
-                    reference_select=cast(
-                        "reference_select_type | None", _reference_select.get(field_name)
-                    ),
+                    reference_select=cast("reference_select_type | None", reference_select_sub),
                 )
             else:
                 # Call from_sqla_row for the direct related model.
@@ -156,9 +159,7 @@ class ModelRowMixin:
                     select_related=set(),
                     prefix=_prefix,
                     old_select_related_value=model_kwargs.get(field_name),
-                    reference_select=cast(
-                        "reference_select_type | None", _reference_select.get(field_name)
-                    ),
+                    reference_select=cast("reference_select_type | None", reference_select_sub),
                 )
 
         # If an `old_select_related_value` (an existing model instance from a former select_related piece) is provided,
