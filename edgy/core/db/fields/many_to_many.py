@@ -621,6 +621,9 @@ class ManyToManyField(ForeignKeyFieldFactory, list):
         if embed_through and "__" in embed_through:
             raise FieldDefinitionError('"embed_through" cannot contain "__".')
 
+        if kwargs.get("primary_key"):
+            raise FieldDefinitionError("`primary_key=True` is not allowed for ManyToMany fields.")
+
         # Set default values specific to Many-to-Many fields.
         kwargs["null"] = True  # M2M fields are conceptually null until related.
         kwargs["exclude"] = True  # M2M fields are typically excluded from direct model data.
