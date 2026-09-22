@@ -83,10 +83,6 @@ class BaseQuerySet(
         group_by: Iterable[str] = _empty_set,
         distinct_on: None | Literal[True] | Iterable[str] = None,
         distinct: None | Literal[True] | Iterable[str] = None,
-        only_fields: Iterable[str] | None = None,
-        only: Iterable[str] = _empty_set,
-        defer_fields: Sequence[str] | None = None,
-        defer: Iterable[str] = _empty_set,
         using_schema: str | None | Any = Undefined,
         table: sqlalchemy.Table | None = None,
         exclude_secrets: bool = False,
@@ -134,18 +130,8 @@ class BaseQuerySet(
         if distinct is True:
             distinct = _empty_set
         self.distinct_on = list(distinct) if distinct is not None else None
-        if only_fields is not None:
-            warnings.warn(
-                "`only_fields` is deprecated use `only`", DeprecationWarning, stacklevel=2
-            )
-            only = only_fields
-        self._only = set(only)
-        if defer_fields is not None:
-            warnings.warn(
-                "`defer_fields` is deprecated use `defer`", DeprecationWarning, stacklevel=2
-            )
-            defer = defer_fields
-        self._defer = set(defer)
+        self._only: set[str] = set()
+        self._defer: set[str] = set()
         self._embed_parent: tuple[str, str | str] | None = None
         self._embed_parent_filters: tuple[str, str | str] | None = None
         self.using_schema = using_schema
@@ -186,8 +172,6 @@ class BaseQuerySet(
             order_by=self._order_by,
             group_by=self._group_by,
             distinct=self.distinct_on,
-            only=self._only,
-            defer=self._defer,
             using_schema=self.using_schema,
             table=getattr(self, "_table", None),
             exclude_secrets=self._exclude_secrets,
@@ -197,6 +181,8 @@ class BaseQuerySet(
         queryset.or_clauses.extend(self.or_clauses)
         queryset._embed_parent = self._embed_parent
         queryset._embed_parent_filters = self._embed_parent_filters
+        queryset._only.update(self._only)
+        queryset._defer.update(self._defer)
         queryset._select_related.update(self._select_related)
         queryset._select_related_g_and_o.update(self._select_related_g_and_o)
         queryset._select_related_embedding.update(self._select_related_embedding)
@@ -379,9 +365,7 @@ class BaseQuerySet(
         ]
         return order_col.desc() if reverse else order_col
 
-    def _update_select_related_weak(
-        self, fields: Iterable[str], *, cache_name: str, clear: bool
-    ) -> bool:
+    def _update_related_weak(self, fields: Iterable[str], *, cache_name: str, clear: bool) -> bool:
         """
         Update the select_related cache with cache_name. This is a special cache,
         which is directly used.
@@ -409,6 +393,19 @@ class BaseQuerySet(
                         embed_parent=self._embed_parent_filters,
                         model_database=self.database,
                     ).forward_path
+                )
+            case "_only" | "_defer":
+                # crossing the db is no problem, it will just may not work.
+                # Because traverse_last is False it works. The last part is treated as field no matter
+                # if relationField or not
+                related_element_fn = lambda field_name: (
+                    clauses_mod.clean_path_to_crawl_result(
+                        self.model_class,
+                        path=field_name,
+                        embed_parent=self._embed_parent_filters,
+                        model_database=self.database,
+                        allow_crossing_db=True,
+                    ).forward_path_to_field
                 )
             case _:
                 raise QuerySetError(f"Invalid cache (`{cache_name}`) used.")

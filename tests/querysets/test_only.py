@@ -21,6 +21,22 @@ class User(edgy.StrictModel):
         registry = models
 
 
+class Profile(edgy.StrictModel):
+    user = edgy.ForeignKey(User, primary_key=True)
+    name = edgy.CharField(max_length=100)
+
+    class Meta:
+        registry = models
+
+
+class Group(edgy.StrictModel):
+    users = edgy.ManyToMany(User)
+    name = edgy.CharField(max_length=100)
+
+    class Meta:
+        registry = models
+
+
 @pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
     async with database:
@@ -37,30 +53,54 @@ async def test_raise_QuerySetError_on_only_and_defer():
         await User.query.only("name").defer("language")
 
 
-async def test_model_only():
-    john = await User.query.create(name="John", language="PT", description="A simple description")
-    jane = await User.query.create(
+@pytest.mark.parametrize(
+    "query_fn,single_result",
+    [
+        pytest.param(lambda group: User.query.only("name", "language"), False, id="direct"),
+        pytest.param(
+            lambda group: Profile.query.update_embed_parent(("user", "")).only(
+                "user__name", "user__language"
+            ),
+            True,
+            id="single",
+        ),
+        pytest.param(lambda group: group.users.only("name", "language"), False, id="multi"),
+    ],
+)
+async def test_only(query_fn, single_result):
+    user1 = await User.query.create(name="John", language="PT", description="A simple description")
+    user2 = await User.query.create(
         name="Jane", language="EN", description="Another simple description"
     )
-    users = await User.query.only("name", "language")
+    await Profile.query.create(user=user1, name="A profile")
+    group = await Group.query.create(users=[user1, user2], name="A group")
+    users = await query_fn(group)
 
-    assert len(users) == 2
-    assert [user.id for user in users] == [john.pk, jane.pk]
+    assert len(users) == (1 if single_result else 2)
+    assert users[0].model_dump() == {"id": 1, "name": "John", "language": "PT"}
 
-    john = users[0]
+    assert "description" not in users[0].model_dump()
+    if not single_result:
+        assert "description" not in users[1].model_dump()
+
+    with pytest.raises(AttributeError):
+        users[0].description  # noqa
+    if not single_result:
+        with pytest.raises(AttributeError):
+            users[1].description  # noqa
+
+    assert "description" not in users[0].model_dump()
+    if not single_result:
+        assert "description" not in users[1].model_dump()
+
+    users = await query_fn(group)
+
+    assert "description" not in users[0].model_dump()
+    if not single_result:
+        assert "description" not in users[1].model_dump()
 
 
-async def test_model_only_attribute_error():
-    john = await User.query.create(name="John", language="PT")
-    users = await User.query.only("name", "language")
-
-    assert len(users) == 1
-    assert users[0].pk == john.pk
-
-    assert "description" not in john.model_dump()
-
-
-async def test_model_only_with_all():
+async def test_only_with_all():
     await User.query.create(name="John", language="PT")
     await User.query.create(name="Jane", language="EN", description="Another simple description")
 
@@ -69,7 +109,7 @@ async def test_model_only_with_all():
     assert len(users) == 2
 
 
-async def test_model_only_with_filter():
+async def test_only_with_filter():
     await User.query.create(name="John", language="PT")
     await User.query.create(name="Jane", language="EN", description="Another simple description")
 
@@ -86,7 +126,7 @@ async def test_model_only_with_filter():
     assert len(users) == 0
 
 
-async def test_model_only_with_exclude():
+async def test_only_with_exclude():
     await User.query.create(name="John", language="PT")
     await User.query.create(name="Jane", language="EN", description="Another simple description")
 
@@ -103,7 +143,7 @@ async def test_model_only_with_exclude():
     assert len(users) == 0
 
 
-async def test_model_only_save():
+async def test_only_save():
     await User.query.create(name="John", language="PT")
 
     user = await User.query.filter(pk=1).only("name", "language").get()
@@ -118,7 +158,7 @@ async def test_model_only_save():
     assert user.language == "EN"
 
 
-async def test_model_only_save_without_nullable_field():
+async def test_only_save_without_nullable_field():
     user = await User.query.create(name="John", language="PT", description="John")
 
     assert user.description == "John"

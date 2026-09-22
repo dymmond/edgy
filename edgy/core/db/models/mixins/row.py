@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import warnings
-from collections.abc import Hashable, Sequence
+from collections.abc import Hashable, Iterable, Sequence
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from edgy.core.db.fields.base import RelationshipField
@@ -13,9 +13,9 @@ if TYPE_CHECKING:  # pragma: no cover
     from sqlalchemy import Table
     from sqlalchemy.engine.row import Row
 
-    from edgy.core.connection import Database
     from edgy.core.db.models.model import Model
     from edgy.core.db.models.types import BaseModelType
+    from edgy.core.db.querysets.queryset import QuerySet
     from edgy.core.db.querysets.types import reference_select_type
 
 
@@ -58,13 +58,9 @@ class ModelRowMixin:
         cls: type[Model],
         *,
         row: Row,
+        queryset: QuerySet,
         tables_and_models: dict[str, tuple[Table, type[BaseModelType]]],
-        select_related: Sequence[Any] | None = None,
-        only_fields: Sequence[str] | None = None,
-        is_defer_fields: bool = False,
-        exclude_secrets: bool = False,
-        using_schema: str | None = None,
-        database: Database | None = None,
+        select_related: set[str] | None = None,
         prefix: str = "",
         old_select_related_value: Model | None = None,
         reference_select: reference_select_type | None = None,
@@ -80,21 +76,12 @@ class ModelRowMixin:
 
         Kwargs:
             row (Row): The SQLAlchemy row result to convert.
+            queryset (QuerySet): The QuerySet in use.
             tables_and_models (dict[str, tuple[Table, type[BaseModelType]]]): A dictionary
                 mapping prefixes to tuples of SQLAlchemy Table objects and Edgy Model types,
                 representing the tables and models involved in the query.
             select_related (Sequence[Any] | None): An optional sequence of relationship
                 names to eager-load. These relationships will be joined in the main query.
-            only_fields (Sequence[str] | None): An optional sequence of field names to
-                include in the model instance. If specified, only these fields will be
-                populated.
-            is_defer_fields (bool): A boolean indicating whether fields are deferred. If
-                True, the model instance will be a proxy model with deferred field loading.
-            exclude_secrets (bool): A boolean indicating whether secret fields should be
-                excluded from the populated model instance.
-            using_schema (str | None): An optional schema name to use for the model.
-            database (Database | None): An optional database instance to associate with
-                the model.
             prefix (str): An optional prefix used for columns in the row mapping,
                 typically for joined tables in `select_related`.
             old_select_related_value (Model | None): An optional existing model instance
@@ -117,13 +104,7 @@ class ModelRowMixin:
             reference_select if reference_select is not None else {}
         )
         model_kwargs: dict[str, Any] = {}  # Dictionary to store the model's attributes.
-        select_related = select_related or []
-        secret_columns: set[str] = set()
-
-        # If exclude_secrets is True, gather all column names corresponding to secret fields.
-        if exclude_secrets:
-            for name in cls.meta.secret_fields:
-                secret_columns.update(cls.meta.field_to_column_names[name])
+        select_related = select_related or set()
 
         # Process select_related relationships.
         for related in select_related:
@@ -164,10 +145,6 @@ class ModelRowMixin:
                     row=row,
                     tables_and_models=tables_and_models,
                     select_related=[remainder],
-                    exclude_secrets=exclude_secrets,
-                    is_defer_fields=is_defer_fields,
-                    using_schema=using_schema,
-                    database=database,
                     prefix=_prefix,
                     old_select_related_value=model_kwargs.get(field_name),
                     reference_select=reference_select_sub,
@@ -177,10 +154,6 @@ class ModelRowMixin:
                 model_kwargs[field_name] = await model_class.from_sqla_row(
                     row=row,
                     tables_and_models=tables_and_models,
-                    exclude_secrets=exclude_secrets,
-                    is_defer_fields=is_defer_fields,
-                    using_schema=using_schema,
-                    database=database,
                     prefix=_prefix,
                     old_select_related_value=model_kwargs.get(field_name),
                     reference_select=reference_select_sub,
@@ -207,7 +180,7 @@ class ModelRowMixin:
             if related in model_kwargs:  # Skip if already populated by select_related.
                 continue
 
-            if exclude_secrets and foreign_key.secret:
+            if queryset._exclude_secrets and foreign_key.secret:
                 continue
 
             columns_to_check = foreign_key.get_column_names(related)
@@ -256,19 +229,19 @@ class ModelRowMixin:
             # Create a proxy model for the related field, representing a lazy-loaded
             # instance containing only the foreign key(s).
             proxy_model = model_related.proxy_model(**child_model_kwargs)
-            proxy_database = database if model_related.database is cls.database else None
+            proxy_database = queryset.database if model_related.database is cls.database else None
 
             # Apply instance extras (schema, database, etc.) to the proxy model.
             # apply_instance_extras filters out table Alias
             proxy_model = apply_instance_extras(
                 proxy_model,
                 model_related,
-                using_schema,
+                queryset.active_schema,
                 database=proxy_database,
             )
             proxy_model.identifying_db_fields = foreign_key.related_columns
             proxy_model.__no_load_trigger_attrs__.update(extra_no_trigger_child)
-            if exclude_secrets:
+            if queryset._exclude_secrets:
                 proxy_model.__no_load_trigger_attrs__.update(model_related.meta.secret_fields)
 
             model_kwargs[related] = proxy_model
@@ -278,12 +251,17 @@ class ModelRowMixin:
         for column in table_columns:
             # Skip if only_fields is specified and the column is not in it.
             if (
-                only_fields
-                and prefix not in only_fields
-                and (f"{prefix}__{column.key}" if prefix else column.key) not in only_fields
+                queryset._only
+                # don't exclude primary keys, no matter if in only_fields or not
+                and not column.primary_key
+                and prefix not in queryset._only
+                and (f"{prefix}__{column.key}" if prefix else column.key) not in queryset._only
             ):
                 continue
-            if column.key in secret_columns:  # Skip if the column is a secret.
+            if (
+                queryset._exclude_secrets
+                and cls.meta.columns_to_field.get(column.key) in cls.meta.secret_fields
+            ):  # Skip if the column is a secret.
                 continue
             if column.key not in class_columns:  # Skip if the column is not part of the model.
                 continue
@@ -318,17 +296,22 @@ class ModelRowMixin:
         model: Model = (
             cls.proxy_model(**model_kwargs, __phase__="init_db")
             # when prefix, embedding could also be in use and lead to partial models
-            if exclude_secrets or is_defer_fields or only_fields or prefix
+            if (
+                queryset._defer
+                or (queryset._exclude_secrets and cls.meta.secret_fields)
+                or (queryset._only and prefix not in queryset._only)
+                or (prefix and prefix not in queryset._select_related)
+            )
             else cls(**model_kwargs, __phase__="init_db")
         )
         model._db_deleted = False
 
-        # Mark the model as fully loaded if no deferred or only_fields are active.
-        if not is_defer_fields and not only_fields:
+        # Mark the model as fully loaded if not a proxy model
+        if not model.__is_proxy_model__:
             model._db_loaded = True
 
         # If excluding secrets, ensure these attributes do not trigger a load.
-        if exclude_secrets:
+        if queryset._exclude_secrets:
             model.__no_load_trigger_attrs__.update(cls.meta.secret_fields)
 
         # Apply instance extras (schema, database, table, etc.) to the main model.
@@ -336,8 +319,8 @@ class ModelRowMixin:
         model = apply_instance_extras(
             model,
             cls,
-            using_schema,
-            database=database,
+            queryset.active_schema,
+            database=queryset.database,
             table=tables_and_models[prefix][0],
         )
 
@@ -346,7 +329,7 @@ class ModelRowMixin:
 
     @classmethod
     def __should_ignore_related_name(
-        cls, related_name: str, select_related: Sequence[str]
+        cls, related_name: str, select_related: Iterable[str]
     ) -> bool:
         """
         Determines whether a foreign key related name should be ignored during model

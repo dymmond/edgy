@@ -44,11 +44,6 @@ class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
                 select_related=self.queryset._select_related.union(
                     self.queryset._select_related_embedding
                 ),
-                only_fields=self.queryset._only,
-                is_defer_fields=self.is_defer_fields,
-                exclude_secrets=self.queryset._exclude_secrets,
-                using_schema=self.queryset.active_schema,
-                database=self.queryset.database,
                 reference_select=self.queryset._reference_select,
             ),
         )
@@ -115,11 +110,6 @@ class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
                 select_related=self.queryset._select_related.union(
                     self.queryset._select_related_embedding
                 ),
-                only_fields=self.queryset._only,
-                is_defer_fields=self.is_defer_fields,
-                exclude_secrets=self.queryset._exclude_secrets,
-                using_schema=self.queryset.active_schema,
-                database=self.queryset.database,
                 reference_select=self.queryset._reference_select,
             ),
             transform_fn=lambda pos, instance: self.queryset._embed_parent_in_result(

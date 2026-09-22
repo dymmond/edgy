@@ -534,12 +534,12 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         """
         queryset: QuerySet = self._clone()
         queryset._order_by = order_by
-        if queryset._update_select_related_weak(
+        if queryset._update_related_weak(
             (x.removeprefix("-") for x in order_by),
             cache_name="_select_related_g_and_o",
             clear=True,
         ):
-            queryset._update_select_related_weak(
+            queryset._update_related_weak(
                 queryset._group_by,
                 cache_name="_select_related_g_and_o",
                 clear=False,
@@ -618,10 +618,10 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         """
         queryset: QuerySet = self._clone()
         queryset._group_by = group_by
-        if queryset._update_select_related_weak(
+        if queryset._update_related_weak(
             group_by, cache_name="_select_related_g_and_o", clear=True
         ):
-            queryset._update_select_related_weak(
+            queryset._update_related_weak(
                 (x.lstrip("-") for x in queryset._order_by),
                 cache_name="_select_related_g_and_o",
                 clear=False,
@@ -666,16 +666,8 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             A new QuerySet clone with the `_only` set attribute containing the selected fields.
         """
         queryset: QuerySet = self._clone()
-        only_fields: set[str] = set(fields)
-        if self.model_class.pknames:
-            for pkname in self.model_class.pknames:
-                if pkname not in fields:
-                    for pkcolumn in self.model_class.meta.get_columns_for_name(pkname):
-                        only_fields.add(pkcolumn.key)
-        else:
-            for pkcolumnname in self.model_class.pkcolumns:
-                only_fields.add(pkcolumnname)
-        queryset._only = only_fields
+        # primary keys are readded in compiler
+        queryset._update_related_weak(fields, cache_name="_only", clear=True)
         return queryset
 
     def defer(self, *fields: str) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
@@ -693,8 +685,8 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             A new QuerySet clone with the `_defer` set attribute containing the fields to skip.
         """
         queryset: QuerySet = self._clone()
-
-        queryset._defer = set(fields)
+        # primary keys are readded in compiler
+        queryset._update_related_weak(fields, cache_name="_defer", clear=True)
         return queryset
 
     def select_related(

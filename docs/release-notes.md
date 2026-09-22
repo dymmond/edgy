@@ -41,6 +41,8 @@
 ### Removed
 
 - Remove long deprecated `fields` and `fields_mapping`.
+- Remove long deprecated `only_fields` and `defer_fields` from QuerySet `__init__`.
+- Remove `only`, `defer`, `embed_parent` from QuerySet `__init__`. They need internal cleanup logic which shouldn't be in `__init__`
 
 ### Breaking
 
@@ -50,6 +52,7 @@
   A DeprecationWarning will be issued if you are affected.
   Upgrade `select_related("company__user")` to `select_related("company","company__user")` or use the keyword `sparse=False`.
 - When querying selected instances are proxy models and may not contain every value (except when selected). This disallows checks like `isinstance(user, User)`. Replace it with `user.get_real_class() is User`.
+- Remove `only`, `defer`, `embed_parent` from QuerySet `__init__`.
 
 ## 0.36.1
 

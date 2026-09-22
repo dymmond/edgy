@@ -140,6 +140,11 @@ class QueryCompiler:
                 parent_model.meta.fields[parent_field_name]
             ):
                 return True
+
+        elif column_key in model_class.pkcolumns:
+            # = no prefix and column_key in model_class.pkcolumns
+            # we need the primary keys also from the main model
+            return True
         ################ now rules to reject ################
 
         # Check .only() rules

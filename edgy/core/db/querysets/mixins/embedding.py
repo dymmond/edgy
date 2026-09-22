@@ -223,7 +223,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                 tables_and_models = (await self_queryset.as_select_with_tables())[1]
             # apply embedding
             prefetched_instance = result
-            if self_queryset._embed_parent_filters and self_queryset._embed_parent_filters[0]:
+            if self_queryset._embed_parent_filters:
                 token = MODEL_GETATTR_BEHAVIOR.set("coro")
                 try:
                     for part in self_queryset._embed_parent_filters[0].split("__"):
@@ -407,7 +407,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
         queryset._prefetch_related = [*self_queryset._prefetch_related, *prefetch]
         select_pathes: set[str] = set()
         # this one extra doesn't matter much from performance perspective, is maybe even cheaper
-        if queryset._embed_parent and queryset._embed_parent[0]:
+        if queryset._embed_parent:
             # can be cross db, so only add the first expanded part
             crawl_result = crawl_relationship(
                 queryset.model_class,
@@ -423,8 +423,8 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                 for prefetch in queryset._prefetch_related
             )
         )
-        # they are sanitized and analyzed later in _update_select_related_weak
-        queryset._update_select_related_weak(
+        # they are sanitized and analyzed later in _update_related_weak
+        queryset._update_related_weak(
             select_pathes, cache_name="_select_related_embedding", clear=True
         )
         return queryset
@@ -448,10 +448,12 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             QuerySetType: A new QuerySet instance with the new embedding.
         """
         self_queryset = cast("QuerySet[EdgyModel, EdgyEmbedTarget]", self)
+        if embed_parent is not None and not embed_parent[0]:
+            raise ValueError("First argument in `embed_parent` tuple can't be empty.")
         queryset = self_queryset._clone()
         queryset._embed_parent = embed_parent
         select_pathes: set[str] = set()
-        if queryset._embed_parent and queryset._embed_parent[0]:
+        if queryset._embed_parent:
             # can be cross db, so only add the first expanded part
             crawl_result = crawl_relationship(
                 queryset.model_class,
@@ -462,7 +464,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             select_pathes.add(crawl_result.forward_path)
 
         if (
-            queryset._update_select_related_weak(
+            queryset._update_related_weak(
                 select_pathes,
                 cache_name="_select_related_embedding",
                 clear=True,
@@ -471,7 +473,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
         ):
             # regenerate prefetch pathes
 
-            queryset._update_select_related_weak(
+            queryset._update_related_weak(
                 chain(
                     *(
                         prefetch._generate_select_related_pathes(queryset)
