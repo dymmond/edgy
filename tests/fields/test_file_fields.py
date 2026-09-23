@@ -119,10 +119,11 @@ async def test_save_file_create(create_test_database):
         assert rob.read() == b"!# /bin/sh"
     path = model.file_field.path
     name = model.file_field.name
-    assert model.file_field.storage.get_accessed_time(name)
-    assert model.file_field.storage.get_modified_time(
-        name
-    ) >= model.file_field.storage.get_created_time(name)
+    stats = os.stat(model.file_field.storage.path(name))
+    assert model.file_field.storage.get_accessed_time(name) == stats.st_atime
+    assert model.file_field.storage.get_modified_time(name) == stats.st_mtime
+    if hasattr(stats, "st_birthtime"):
+        assert model.file_field.storage.get_created_time(name) == stats.st_birthtime
     assert os.path.exists(path)
     assert model.file_field.storage.exists(model.file_field.name)
     model.file_field.delete()
