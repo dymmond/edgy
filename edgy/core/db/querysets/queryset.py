@@ -682,7 +682,6 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             A new QuerySet clone with the `_defer` set attribute containing the fields to skip.
         """
         queryset: QuerySet = self._clone()
-        # primary keys are readded in compiler
         queryset._update_related_weak(fields, cache_name="_defer", clear=True)
         return queryset
 
