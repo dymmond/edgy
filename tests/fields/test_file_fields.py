@@ -120,6 +120,7 @@ async def test_save_file_create(create_test_database):
     path = model.file_field.path
     name = model.file_field.name
     stats = os.stat(model.file_field.storage.path(name))
+    # the floats must be the same, so no need to add an epsilon
     assert model.file_field.storage.get_accessed_time(name) == stats.st_atime
     assert model.file_field.storage.get_modified_time(name) == stats.st_mtime
     if hasattr(stats, "st_birthtime"):
