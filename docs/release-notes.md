@@ -29,6 +29,7 @@
 - Make `embed_parent` and `embed_parent_filters` internal (prefixed with `_`).
 - Identity checks may need an update when doing the check on a non-selected path (e.g. implicitly added paths for prefetches).
   Replace idioms `isinstance(user, User)` with `user.get_real_class() is User` for maximal compatibility.
+- Deprecate setting attributes on `QuerySet` via keywords and remove some of them.
 
 ### Fixed
 
@@ -42,7 +43,7 @@
 
 - Remove long deprecated `fields` and `fields_mapping`.
 - Remove long deprecated `only_fields`, `defer_fields`, `distinct_on`, `limit_count`, `limit_offset` kwargs from QuerySet `__init__`.
-- Remove `only`, `defer`, `embed_parent`, `select_related` from QuerySet `__init__`. They need internal cleanup logic which shouldn't be called in `__init__` and may end in loops.
+- Remove `only`, `defer`, `embed_parent`, `select_related` from QuerySet `__init__`. They need internal cleanup logic which shouldn't be called in `__init__` and may end in loops. Deprecate the rest.
 
 
 ### Breaking

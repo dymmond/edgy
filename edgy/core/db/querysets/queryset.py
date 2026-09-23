@@ -644,9 +644,9 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         if first is False:
             queryset.distinct_on = None
         elif first is True:
-            queryset.distinct_on = []
+            queryset.distinct_on = ()
         else:
-            queryset.distinct_on = [first, *distinct_on]
+            queryset.distinct_on = (first, *distinct_on)
         return queryset
 
     def only(self, *fields: str) -> QuerySet[EdgyModel, EdgyEmbedTarget]:

@@ -30,7 +30,8 @@ class CombinedQuerySet(QuerySet):
         op: str = "union",
     ) -> None:
         # initialize as a normal QuerySet bound to the same model/database
-        super().__init__(model_class=left.model_class, database=left.database)
+        super().__init__(model_class=left.model_class)
+        self.database = left.database
         self._suppress_pk_deduplication = True
         self._left = left
         self._right = right
@@ -101,49 +102,13 @@ class CombinedQuerySet(QuerySet):
             tables_and_models[crawl_result.forward_path][0].columns[crawl_result.field_name],
         )
 
-    def _clone(self) -> CombinedQuerySet:
+    def _create_clone_instance(self) -> CombinedQuerySet:
         """
         Return a copy of this CombinedQuerySet that preserves the left/right branches,
         the chosen set operation, and all the usual queryset flags (filters, order_by, etc).
         """
         # Rebuild with the same branches/op
-        queryset = self.__class__(left=self._left, right=self._right, op=self._op)
-
-        # Copy commonly-cloned attributes from BaseQuerySet._clone()
-        queryset.filter_clauses = list(self.filter_clauses)
-        queryset.or_clauses.extend(self.or_clauses)
-
-        queryset._aliases = dict(getattr(self, "_aliases", {}))
-        queryset.limit_count = self.limit_count
-        queryset._offset = self._offset
-        queryset._batch_size = self._batch_size
-        queryset._order_by = self._order_by
-        queryset._group_by = self._group_by
-
-        # distinct handling mirrors BaseQuerySet._clone behavior
-        queryset.distinct_on = (
-            self.distinct_on[:] if isinstance(self.distinct_on, list) else self.distinct_on
-        )
-
-        queryset._only = set(self._only)
-        queryset._defer = set(self._defer)
-
-        queryset._embed_parent = self._embed_parent
-        queryset._embed_parent_filters = self._embed_parent_filters
-        queryset.using_schema = self.using_schema
-        queryset.active_schema = self.active_schema
-
-        queryset._extra_select = list(self._extra_select)
-        queryset._reference_select = (
-            self._reference_select.copy() if isinstance(self._reference_select, dict) else {}
-        )
-
-        # Select-related caches: copy values to avoid recomputation unless necessary
-        queryset._select_related.update(self._select_related)
-        queryset._select_related_g_and_o.update(self._select_related_g_and_o)
-        queryset._select_related_embedding.update(self._select_related_embedding)
-        queryset._cached_select_related_expression = self._cached_select_related_expression
-
+        queryset = type(self)(left=self._left, right=self._right, op=self._op)
         # Locking is not supported for combined sets; ensure none is carried
         queryset._for_update = None
 

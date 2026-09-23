@@ -112,7 +112,10 @@ class Manager(BaseManager):
             database = self.owner.database
 
         # Return a new QuerySet initialized with the owner, schema, and database.
-        return self.queryset_class(self.owner, using_schema=using_schema, database=database)
+        queryset = self.queryset_class(self.owner)
+        queryset.using_schema = using_schema
+        queryset.database = database
+        return queryset
 
     def __getattr__(self, name: str) -> Any:
         """
