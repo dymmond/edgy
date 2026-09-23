@@ -21,7 +21,7 @@
 - Assign prefetches from queryset not in `from_sqla_row`. This allows better handling of embeddings.
 - `create_model_key_from_sqla_row` is deprecated now. Use the more generalized `create_model_key_from_raw_mapping` for the row mapping (`row._mapping`) instead.
 - Move `get_table_key_or_name` to `edgy.core.utils.db`.
-- Add embedded path part of source db implicit to select_related paths.
+- Add the embedded path of the source database implicitly to `select_related` paths.
 - `crawl_relationship` has now a better error when a field does not exist.
 - Unpacking and accessing `CrawlResult` (the result of `crawl_relationship`) is now deprecated. Use the results attributes instead.
 - `select_related` has now a sparse mode, which will become the default in future. It doesn't select all columns on the intermediate paths but only the ones required for traversal.
