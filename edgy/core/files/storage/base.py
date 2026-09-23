@@ -78,7 +78,7 @@ class Storage(ABC):
         return self._open(name, mode)
 
     @abstractmethod
-    def _save(self, content: "File", name: str = "") -> None:
+    def _save(self, content: "File", name: str) -> None:
         """
         Abstract method to save content to the storage system.
         Concrete storage implementations must provide their specific logic here.
