@@ -448,8 +448,11 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             QuerySetType: A new QuerySet instance with the new embedding.
         """
         self_queryset = cast("QuerySet[EdgyModel, EdgyEmbedTarget]", self)
-        if embed_parent is not None and not embed_parent[0]:
-            raise ValueError("First argument in `embed_parent` tuple can't be empty.")
+        if embed_parent is not None:
+            if len(cast(tuple, embed_parent)) != 2:
+                raise ValueError("Provided tuple has not exactly two elements.")
+            if not embed_parent[0]:
+                raise ValueError("First argument in `embed_parent` tuple can't be empty.")
         queryset = self_queryset._clone()
         queryset._embed_parent = embed_parent
         select_pathes: set[str] = set()
