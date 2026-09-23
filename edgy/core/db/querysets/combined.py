@@ -35,8 +35,7 @@ class CombinedQuerySet(QuerySet):
         self._left = left
         self._right = right
         self._op: str = op
-        self.pkcolumns = sorted({*self._left.pkcolumns, *self._right.pkcolumns})
-        self.pknames = sorted({*self._left.pknames, *self._right.pknames})
+
         # update cache attrs used for caching
         self._cache.attrs = self.pkcolumns
 
@@ -49,6 +48,13 @@ class CombinedQuerySet(QuerySet):
             raise QuerySetError(
                 detail="CombinedQuerySet requires both sides to have the same model class."
             )
+
+        # for future if we allow left.model_class is not right.model_class:
+        # if set(self._left.pkcolumns) != set(self._right.pkcolumns):
+        #     raise QuerySetError(
+        #         detail="CombinedQuerySet requires both sides to have the same pkcolumns."
+        #     )
+
         if getattr(left.database, "dsn", None) != getattr(right.database, "dsn", None):  # noqa
             if getattr(left.database, "url", None) != getattr(right.database, "url", None):
                 raise QuerySetError(
