@@ -126,7 +126,7 @@ class QueryCompiler:
             if (
                 qs._prefetch_related
                 and prefix in qs._select_related_embedding
-                and column_key in model_class.pkcolumns
+                and column_key in qs.pkcolumns
             ):
                 return True
             # retrieve the field and the parent model
@@ -142,7 +142,7 @@ class QueryCompiler:
                 parent_model.meta.fields[parent_field_name]
             ):
                 return True
-        elif column_key in model_class.pkcolumns:
+        elif column_key in qs.pkcolumns:
             # = no prefix and column_key in model_class.pkcolumns
             # we need the primary keys also from the root model to load
             return True

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from functools import cached_property
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
@@ -97,7 +98,7 @@ class QuerySetPropsMixin:
         # Clear the cache to ensure any dependent components are refreshed.
         self._clear_cache()
 
-    @property
+    @cached_property
     def pknames(self) -> Sequence[str]:
         """
         Returns a sequence of primary key names for the model class associated
@@ -115,7 +116,7 @@ class QuerySetPropsMixin:
         # as Sequence[str] in some contexts.
         return self.model_class.pknames  # type: ignore
 
-    @property
+    @cached_property
     def pkcolumns(self) -> Sequence[str]:
         """
         Returns a sequence of primary key column names for the model class

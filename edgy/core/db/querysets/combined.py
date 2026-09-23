@@ -35,6 +35,10 @@ class CombinedQuerySet(QuerySet):
         self._left = left
         self._right = right
         self._op: str = op
+        self.pkcolumns = sorted({*self._left.pkcolumns, *self._right.pkcolumns})
+        self.pknames = sorted({*self._left.pknames, *self._right.pknames})
+        # update cache attrs used for caching
+        self._cache.attrs = self.pkcolumns
 
         # carry over schema from the left side
         self.using_schema = left.using_schema

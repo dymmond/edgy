@@ -117,7 +117,7 @@ class BaseQuerySet(
             reference_select.copy() if isinstance(reference_select, dict) else {}
         )
         self._exclude_secrets = exclude_secrets
-        self._cache = QueryModelResultCache(attrs=self.model_class.pkcolumns)
+        self._cache = QueryModelResultCache(attrs=self.pkcolumns)
         self._clear_cache(keep_result_cache=False)
         self._cached_select_related_expression: (
             tuple[Any, dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]]] | None
