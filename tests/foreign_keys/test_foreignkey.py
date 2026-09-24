@@ -150,9 +150,27 @@ async def test_create_via_relation_create():
     album = await Album.query.create(name="Malibu")
     await album.tracks_set.create(title="The Bird", position=1)
     await album.tracks_set.create(title="Heart don't stand a chance", position=2)
-    tracks = await album.tracks_set.all()
+    await album.tracks_set.get_or_create({"position": 5}, title="Heart don't stand a chance")
+    tracks = await album.tracks_set.order_by("position")
 
     assert len(tracks) == 2
+    assert tracks[1].position == 2
+
+
+async def test_create_via_relation_bulk_create():
+    org = await Organisation.query.create(ident="foobar")
+    teams_input = [
+        {"name": "Team Red"},
+        {"name": "Team Blue"},
+    ]
+    teams = await org.teams_set.bulk_create(teams_input)
+    assert len(teams) == 2
+    teams = await org.teams_set.all()
+    assert len(teams) == 2
+    teams = await org.teams_set.bulk_get_or_create(teams_input, unique_fields=["name"])
+    assert len(teams) == 2
+    teams = await org.teams_set.all()
+    assert len(teams) == 2
 
 
 async def test_create_dynamic():

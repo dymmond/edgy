@@ -9,13 +9,14 @@ from collections.abc import (
 )
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
+from inspect import isawaitable
 from typing import TYPE_CHECKING, Any, Generic, cast
 
 import orjson
 import sqlalchemy
 from sqlalchemy.exc import IntegrityError
 
-from edgy.core.db.context_vars import CURRENT_INSTANCE
+from edgy.core.db.context_vars import CURRENT_INSTANCE, MODEL_GETATTR_BEHAVIOR
 from edgy.core.utils.concurrency import run_concurrently
 from edgy.core.utils.db import check_db_connection
 from edgy.exceptions import QuerySetError, SkipOperation
@@ -168,9 +169,17 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
                 )
             created: EdgyModel
             if isinstance(obj, dict):
-                created = self.model_class(
-                    **{k: v for k, v in obj.items() if k in self.model_class.meta.fields}
-                )
+                if self.owner._injected_create_handler:
+                    created = cast(
+                        "EdgyModel",
+                        self.owner._injected_create_handler(
+                            {k: v for k, v in obj.items() if k in self.model_class.meta.fields}, []
+                        ),
+                    )
+                else:
+                    created = self.model_class(
+                        **{k: v for k, v in obj.items() if k in self.model_class.meta.fields}
+                    )
                 self.create_params.append((created, pos, set(obj.keys())))
             else:
                 created = obj
@@ -283,17 +292,23 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
                                 break
                     if found_obj is not None:
                         if self.update:
+                            update_obj = found_obj
+                            if self.owner._embed_parent_filters:
+                                for path in self.owner._embed_parent_filters[0].split("__"):
+                                    update_obj = getattr(update_obj, path)
+                                    if isawaitable(update_obj):
+                                        update_obj = await update_obj
                             if isinstance(obj, dict):
                                 for key in self.update_fields:
                                     if key in obj:
-                                        setattr(found_obj, key, obj[key])
+                                        setattr(update_obj, key, obj[key])
                                 self.update_params.append((found_obj, pos, set(obj.keys())))
                             else:
                                 for key in self.update_fields:
                                     if hasattr(obj, key):
                                         setattr(found_obj, key, getattr(obj, key))
                                 self.update_params.append(
-                                    (found_obj, pos, set(obj.meta.fields.keys()))
+                                    (update_obj, pos, set(obj.meta.fields.keys()))
                                 )
                         return None if self.none_on_existing else found_obj, False
                     elif self.create:
@@ -301,10 +316,14 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
                     else:
                         return None, False
 
-                self.instances_and_created = await run_concurrently(
-                    [_iterate_retrieve(obj, pos) for pos, obj in enumerate(objs)],
-                    limit=concurrent_limit,
-                )
+                retrieve_token = MODEL_GETATTR_BEHAVIOR.set("coro")
+                try:
+                    self.instances_and_created = await run_concurrently(
+                        [_iterate_retrieve(obj, pos) for pos, obj in enumerate(objs)],
+                        limit=concurrent_limit,
+                    )
+                finally:
+                    MODEL_GETATTR_BEHAVIOR.reset(retrieve_token)
         elif self.create:
             for pos, obj in enumerate(objs):
                 self.instances_and_created.append(_add_create_obj(obj, pos))

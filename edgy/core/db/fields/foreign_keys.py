@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from functools import cached_property
 from typing import (
     Any,
@@ -376,8 +376,8 @@ class BaseForeignKeyField(BaseForeignKey):
                 return None
             return value
 
-        # If there's only one related column and the value is not a dict/BaseModel.
-        if len(related_columns) == 1 and not isinstance(value, dict | BaseModel):
+        # If there's only one related column and the value is not a Mapping/BaseModel.
+        if len(related_columns) == 1 and not isinstance(value, Mapping | BaseModel):
             # Convert the scalar value into a dictionary for the single related column.
             value = {next(iter(related_columns)): value}
         # If value is a BaseModel, extract related column values into a dictionary.

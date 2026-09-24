@@ -32,12 +32,14 @@ class CombinedQuerySet(QuerySet):
         # initialize as a normal QuerySet bound to the same model/database
         super().__init__(model_class=left.model_class)
         self.database = left.database
+        # can't do this here
+        self._injected_create_handler = None
         self._suppress_pk_deduplication = True
         self._left = left
         self._right = right
         self._op: str = op
 
-        # update cache attrs used for caching
+        # update attrs used for caching
         self._cache.attrs = self.pkcolumns
 
         # carry over schema from the left side

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Literal, cast
 
@@ -140,6 +140,7 @@ class ManyRelation(ManyRelationProtocol):
             # add also to _select_related_embedding, because it is the part of select related evaluated
             # for prefetches sub attachments
             queryset._select_related_embedding.add(self.to_foreign_key)
+        queryset._injected_create_handler = self.expand_relationship
         return queryset.using(schema=self.instance.get_active_instance_schema())
 
     async def save_related(self) -> None:
@@ -234,7 +235,7 @@ class ManyRelation(ManyRelationProtocol):
         # get_queryset already returns a fresh queryset, so no need to make a copy.
         return self.get_queryset()
 
-    def expand_relationship(self, value: Any) -> BaseModelType:
+    def expand_relationship(self, value: Any, args: Iterable[Any] = ()) -> BaseModelType:
         """
         Expands a given value into an instance of the `through` model or its
         proxy model, preparing it for inclusion in the relationship. This
@@ -244,6 +245,7 @@ class ManyRelation(ManyRelationProtocol):
             value (Any): The value to expand, which can be an instance of the
                          `through` model, its proxy, the `to` model, its proxy,
                          or a dictionary.
+            args (Iterable): Provide optional positional arguments to constructor. For ModelRefs.
 
         Returns:
             Any: An instance of the `through` model or its proxy, ready for use
@@ -252,7 +254,7 @@ class ManyRelation(ManyRelationProtocol):
         # Validate that the child is compatible with the relationship.
         if not isinstance(
             value,
-            self.to | self.to.proxy_model | self.through | self.through.proxy_model | dict,
+            (self.to, self.to.proxy_model, self.through, self.through.proxy_model, Mapping),
         ):
             raise RelationshipIncompatible(
                 f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'."
@@ -262,7 +264,9 @@ class ManyRelation(ManyRelationProtocol):
         # If the value is already an instance of the through model or its proxy, return it directly.
         if isinstance(value, through | through.proxy_model):
             return value
-
+        # create a proper instance, because we need it either and can so pass ref args
+        if isinstance(value, Mapping):
+            value = self.to.proxy_model(*args, **value)
         # Create a new proxy model instance of the 'through' model.
         # This instance links the current 'from' model instance with the 'to' model instance.
         instance = through.proxy_model(
@@ -696,6 +700,7 @@ class SingleRelation(ManyRelationProtocol):
                 RelationshipField,
             ):
                 queryset._embed_parent_filters = queryset._embed_parent
+        queryset._injected_create_handler = self.expand_relationship
         return queryset
 
     def all(self, clear_cache: bool = False) -> QuerySet:
@@ -713,7 +718,7 @@ class SingleRelation(ManyRelationProtocol):
         # get_queryset already returns a fresh queryset, so no need to make a copy.
         return self.get_queryset()
 
-    def expand_relationship(self, value: Any) -> Any:
+    def expand_relationship(self, value: Any, args: Iterable[Any] = ()) -> Any:
         """
         Expands a given value into an instance of the `to` model or its
         proxy model, preparing it for inclusion in the relationship.
@@ -723,13 +728,14 @@ class SingleRelation(ManyRelationProtocol):
         Args:
             value (Any): The value to expand, which can be an instance of the
                          `to` model, its proxy, a dictionary, or a primitive type.
+            args (Iterable): Provide optional positional arguments to constructor. For ModelRefs.
 
         Returns:
             Any: An instance of the `to` model or its proxy, ready for use
                  in the relationship.
         """
         target = self.to
-        if not isinstance(value, self.to | self.to.proxy_model | dict):
+        if not isinstance(value, (self.to, self.to.proxy_model, Mapping)):
             raise RelationshipIncompatible(f"The child is not from the type '{self.to.__name__}'.")
 
         # If the value is already an instance of the target model or its proxy, return it directly.
@@ -740,10 +746,10 @@ class SingleRelation(ManyRelationProtocol):
         related_columns = tuple(self.to.meta.fields[self.to_foreign_key].related_columns.keys())
         # If there's only one related column and the value is not a dict or BaseModel,
         # wrap it in a dictionary with the related column name as key.
-        if len(related_columns) == 1 and not isinstance(value, dict | BaseModel):
+        if len(related_columns) == 1 and not isinstance(value, Mapping | BaseModel):
             value = {next(iter(related_columns)): value}
         # Create a new proxy model instance of the 'to' model using the value.
-        target_instance = target.proxy_model(**value)
+        target_instance = target.proxy_model(*args, **value)
         setattr(target_instance, self.to_foreign_key, self.instance)
         # Set identifying database fields for the 'to' model instance.
         target_instance.identifying_db_fields = related_columns
@@ -856,6 +862,12 @@ class SingleRelation(ManyRelationProtocol):
         operation.signal_params["instance"] = self.instance
         await operation.send_post_signal()
 
+    def _prepare_create_instance(self, *args: Any, **kwargs: Any) -> BaseModelType:
+        """Prepare for create."""
+        # we need to add the instance here to satisfy pydantic constraints
+        kwargs[self.to_foreign_key] = self.instance
+        return self.to.proxy_model(*args, **kwargs)
+
     async def create(self, *args: Any, **kwargs: Any) -> BaseModelType | None:
         """
         Creates a new instance of the 'to' model and immediately adds it
@@ -868,9 +880,7 @@ class SingleRelation(ManyRelationProtocol):
         Returns:
             BaseModelType | None: The newly created and added child instance.
         """
-        # we need to add the instance here to satisfy pydantic constraints
-        kwargs[self.to_foreign_key] = self.instance
-        return await self.add(self.to(*args, **kwargs))
+        return await self.add(self._prepare_create_instance(*args, **kwargs))
 
     async def add(self, child: BaseModelType) -> BaseModelType | None:
         """
@@ -981,9 +991,8 @@ class SingleRelation(ManyRelationProtocol):
             return
 
         to = self.to
-        queryset = self.get_queryset()
         operation = BulkOperation(
-            owner=queryset,
+            owner=self.get_queryset(),
             unique_columns=to.pkcolumns,
             update_fields={self.to_foreign_key},
             signal_models=[
@@ -1014,7 +1023,8 @@ class SingleRelation(ManyRelationProtocol):
         obj_ids = [id(obj) for obj in raw_values]
         operation.update_params = [tup for tup in operation.update_params if id(tup[0]) in obj_ids]
 
-        async with queryset.transaction():
+        # owner = queryset
+        async with operation.owner.transaction():
             await operation.apply_db()
             # the queryset is temporary and maybe even resetted, so we don't need to update the cache
             if operation.row_count_update != len(raw_values):

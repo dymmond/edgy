@@ -104,7 +104,9 @@ class BaseQuerySet(
         self.distinct_on: tuple[str, ...] | None = (
             tuple(distinct) if distinct is not None else None
         )
-        self._inject_create_instance: tuple[str, BaseModelType] | None = None
+        self._injected_create_handler: (
+            Callable[[dict[str, Any] | BaseModelType, Iterable], BaseModelType] | None
+        ) = None
         self._only: set[str] = set()
         self._defer: set[str] = set()
         self._embed_parent: tuple[str, str | str] | None = None
@@ -165,7 +167,7 @@ class BaseQuerySet(
         queryset._batch_size = self._batch_size
         queryset.filter_clauses.extend(self.filter_clauses)
         queryset.or_clauses.extend(self.or_clauses)
-        queryset._inject_create_instance = self._inject_create_instance
+        queryset._injected_create_handler = self._injected_create_handler
         queryset._embed_parent = self._embed_parent
         queryset._embed_parent_filters = self._embed_parent_filters
         queryset._only.update(self._only)

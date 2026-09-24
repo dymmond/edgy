@@ -1006,7 +1006,10 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         check_db_connection(queryset.database)
         token = CHECK_DB_CONNECTION_SILENCED.set(True)
         try:
-            instance = queryset.model_class(*args, **kwargs)
+            if fn := self._injected_create_handler:
+                instance = fn(kwargs, args)
+            else:
+                instance = queryset.model_class(*args, **kwargs)
             # apply_instance_extras filters out table Alias
             apply_instance_extras(
                 instance,
@@ -1182,8 +1185,12 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         try:
             raw_instance, resolved = await self._get_raw(kwargs=kwargs)
         except ObjectNotFound:
-            kwargs.update(defaults)
-            instance: EdgyEmbedTarget = await self.create(*args, **kwargs)
+            new_create_dict: dict[str, Any] = dict(defaults)
+            # we are somewhere else
+            for k, v in kwargs.items():
+                if "__" not in k:
+                    new_create_dict.setdefault(k, v)
+            instance: EdgyEmbedTarget = await self.create(*args, **new_create_dict)
             return instance, True
         for arg in args:
             if isinstance(arg, ModelRef):

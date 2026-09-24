@@ -123,6 +123,25 @@ async def test_add_many_to_many_new():
     assert isinstance(track1.track_albumtracks_set, ManyRelation)
 
 
+async def test_add_many_to_many_create():
+    await Album.query.create(name="Fake")
+
+    album = await Album.query.create(name="Malibu")
+    assert await album.tracks.create(title="The Bird", position=1)
+    assert await album.tracks.create(title="Heart don't stand a chance", position=2)
+    await album.tracks.create(title="The Waters", position=3)
+    # we can't rebase yet
+    assert await album.tracks.get_or_create(
+        {"track": {"title": "The Waters", "position": 30}}, title="The Waters"
+    )
+
+    total_tracks = await album.tracks.order_by("position")
+    assert len(total_tracks) == 3
+    for track in total_tracks:
+        assert track.embedded.album.pk == album.pk
+    assert total_tracks[2].position == 3
+
+
 async def test_add_many_to_many_with_repeated_field():
     track1 = await Track.query.create(title="The Bird", position=1)
     track2 = await Track.query.create(title="Heart don't stand a chance", position=2)
@@ -278,7 +297,7 @@ async def test_many_to_many_many_fields():
     assert total_tracks_album3[0].pk == track3.pk
 
 
-async def xtest_related_name_query():
+async def test_related_name_query():
     album = await Album.query.create(name="Malibu")
     album2 = await Album.query.create(name="Santa Monica")
 

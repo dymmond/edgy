@@ -404,7 +404,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             raise QuerySetError("The prefetch_related must have Prefetch type objects only.")
 
         # Append the new prefetch objects to the queryset's internal list.
-        queryset._prefetch_related = [*self_queryset._prefetch_related, *prefetch]
+        queryset._prefetch_related = tuple(chain(self_queryset._prefetch_related, prefetch))
         select_pathes: set[str] = set()
         # this one extra doesn't matter much from performance perspective, is maybe even cheaper
         if queryset._embed_parent:
