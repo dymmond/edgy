@@ -48,7 +48,7 @@ to the [related name][related_name] as per normal search.
 ManyToMany allows some different methods when using it (the same applies for the reverse side).
 
 * `add(obj) -> finalobj | None` - Adds a record to the ManyToMany. Return `None` when adding failed, the finalized object with primary key set otherwise.
-* `create(*args, **kwargs) -> finalobj | None` - Create a new record and add it to the ManyToMany relation. This method is deviating from `QuerySet.create` by returning `None` when not succeeding.
+* `create(*args, **kwargs) -> finalobj | None` - Create a new record and add it to the ManyToMany relation. This method deviates from `QuerySet.create`: it returns `None` when the record is not added to the relation.
 * `remove(obj) -> None` - Removes a record from the ManyToMany relation.
 * `add_many(*objs) -> list[finalobj | None]` - Adds multiple records to the ManyToMany relation. Return list with return values of `add`.
 * `remove_many(*objs) -> None` - Removes multiple records from the ManyToMany relation.
