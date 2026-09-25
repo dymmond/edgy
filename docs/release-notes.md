@@ -34,11 +34,12 @@
 ### Fixed
 
 - `ForeignKey`s on unique columns became incorrectly unique.
-- Using `create` in non-nullable ForeignKey relations.
+- Using `create` on non-nullable ForeignKey relations.
 - Don't mask AttributeErrors in managers when creating the queryset failed.
 - `to_attr` and `from_anchor` of Prefetch doesn't require explicit `select_related` calls anymore. They are deduced.
 - Performance issues with `update_embed_parent` when not using `select_related`. Also implicit deduced.
-- Direct bulk operations on relations.
+- Direct bulk and other create operations on relations.
+  Note: The `create` operation stays special for relations.
 
 ### Removed
 
