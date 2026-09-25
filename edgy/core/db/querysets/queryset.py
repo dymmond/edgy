@@ -436,8 +436,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         return queryset
 
     def extra_select(
-        self,
-        *extra: sqlalchemy.ClauseElement,
+        self, *extra: sqlalchemy.ClauseElement, replace: bool = False
     ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Adds extra columns or expressions to the SELECT statement.
@@ -445,11 +444,16 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         Args:
             *extra (sqlalchemy.ColumnClause): Additional SQLAlchemy column clauses or expressions.
 
+        Kwargs:
+            replace: Stack (default) or replace the current extras with `replace=True`.
+
         Returns:
             QuerySetType: A new QuerySet with the extra select clauses.
         """
         queryset = self._clone()
-        queryset._extra_select.extend(extra)
+        if not replace:
+            extra = (*queryset._extra_select, *extra)
+        queryset._extra_select = extra
         return queryset
 
     def reference_select(self, references: reference_select_type) -> QuerySetType:

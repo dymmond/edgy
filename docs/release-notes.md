@@ -8,6 +8,7 @@
 - Allow sub-attributes (select_related) for prefetches as anchor.
 - Allow chaining `to_attr` to anchor by prefixing with `+`.
 - `crawl_relationship` has now a mode to traverse databases.
+- Add `replace` keyword to `extra_select`.
 
 ### Changed
 

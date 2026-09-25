@@ -1007,8 +1007,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
 
     @abstractmethod
     def extra_select(
-        self,
-        *extra: sqlalchemy.ClauseElement,
+        self, *extra: sqlalchemy.ClauseElement, replace: bool = False
     ) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
         """
         Abstract method to add extra select clauses to the QuerySet.
@@ -1016,6 +1015,9 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         Args:
             *extra (sqlalchemy.ClauseElement): One or more SQLAlchemy clause elements
                                                to add to the SELECT statement.
+
+        Kwargs:
+            replace: Stack (default) or replace the current extras with `replace=True`.
 
         Returns:
             QuerySetType: A new QuerySet instance with the extra select clauses.

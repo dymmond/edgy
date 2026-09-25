@@ -133,7 +133,7 @@ class BaseQuerySet(
         self._embed_parent: tuple[str, str | str] | None = None
         self._embed_parent_filters: tuple[str, str | str] | None = None
         self.using_schema: str | None | Any = using_schema
-        self._extra_select: Iterable[sqlalchemy.ClauseElement] | None = tuple(
+        self._extra_select: tuple[sqlalchemy.ClauseElement, ...] = tuple(
             kwargs.get("extra_select", _empty_set)
         )
         self._reference_select: reference_select_type = {}
