@@ -150,7 +150,11 @@ async def test_create_via_relation_create():
     album = await Album.query.create(name="Malibu")
     await album.tracks_set.create(title="The Bird", position=1)
     await album.tracks_set.create(title="Heart don't stand a chance", position=2)
-    await album.tracks_set.get_or_create({"position": 5}, title="Heart don't stand a chance")
+    track, created = await album.tracks_set.get_or_create(
+        {"position": 5}, title="Heart don't stand a chance"
+    )
+    assert not created
+    assert track.position == 2
     tracks = await album.tracks_set.order_by("position")
 
     assert len(tracks) == 2

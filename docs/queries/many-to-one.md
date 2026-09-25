@@ -11,7 +11,7 @@ Many-to-one relations allow three different methods when using them (the same ap
 * `add(obj) -> finalobj | None` - Adds a record to the relation (Updates the ForeignKey). Return `None` when adding was not possible.
 * `create(*args, **kwargs) -> finalobj | None` - Create a new record and add it to the relation. This method is deviating from `QuerySet.create` by returning `None` when not succeeding.
 * `remove(obj) -> None` - Removes a record from the relation (sets the ForeignKey to None).
-* `add_many(*objs) -> list[finalobj | None]` - Adds multiple records to the ManyToMany. Return list with return values of `add`.
+* `add_many(*objs) -> list[finalobj | None]` - Adds multiple records to the relation. Return list with return values of `add`.
 * `remove_many(*objs) -> None` - Removes multiple records from the relation.
 
 And we have normal QuerySet operations.
