@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import warnings
 from collections.abc import (
     AsyncIterator,
     Awaitable,
@@ -72,22 +71,13 @@ class BaseQuerySet(
         *,
         database: Database | None = None,
         filter_clauses: Iterable[Any] = _empty_set,
-        select_related: Iterable[str] = _empty_set,
         prefetch_related: Iterable[Prefetch] = _empty_set,
-        limit_count: int | None = None,
         limit: int | None = None,
-        limit_offset: int | None = None,
         offset: int | None = None,
         batch_size: int | None = None,
         order_by: Iterable[str] = _empty_set,
         group_by: Iterable[str] = _empty_set,
-        distinct_on: None | Literal[True] | Iterable[str] = None,
         distinct: None | Literal[True] | Iterable[str] = None,
-        only_fields: Iterable[str] | None = None,
-        only: Iterable[str] = _empty_set,
-        defer_fields: Sequence[str] | None = None,
-        defer: Iterable[str] = _empty_set,
-        embed_parent: tuple[str, str | str] | None = None,
         using_schema: str | None | Any = Undefined,
         table: sqlalchemy.Table | None = None,
         exclude_secrets: bool = False,
@@ -102,60 +92,32 @@ class BaseQuerySet(
         self.filter_clauses: list[Any] = list(filter_clauses)
         self.or_clauses: list[Any] = []
         self._aliases: dict[str, sqlalchemy.Alias] = {}
-        if limit_count is not None:
-            warnings.warn(
-                "`limit_count` is deprecated use `limit`", DeprecationWarning, stacklevel=2
-            )
-            limit = limit_count
         self.limit_count = limit
-        if limit_offset is not None:
-            warnings.warn(
-                "`limit_offset` is deprecated use `limit`", DeprecationWarning, stacklevel=2
-            )
-            offset = limit_offset
         self._offset = offset
-        select_related = set(select_related)
         self._select_related: set[str] = set()
         # groups and order by
         self._select_related_g_and_o: set[str] = set()
         # embedded, like embed_parent or prefetches
         self._select_related_embedding: set[str] = set()
-        if select_related:
-            self._update_select_related(select_related)
         self._prefetch_related = list(prefetch_related)
         self._batch_size = batch_size
         self._order_by: tuple[str, ...] = tuple(order_by)
         self._group_by: tuple[str, ...] = tuple(group_by)
-        if distinct_on is not None:
-            warnings.warn(
-                "`distinct_on` is deprecated use `distinct`", DeprecationWarning, stacklevel=2
-            )
-            distinct = distinct_on
 
         if distinct is True:
             distinct = _empty_set
         self.distinct_on = list(distinct) if distinct is not None else None
-        if only_fields is not None:
-            warnings.warn(
-                "`only_fields` is deprecated use `only`", DeprecationWarning, stacklevel=2
-            )
-            only = only_fields
-        self._only = set(only)
-        if defer_fields is not None:
-            warnings.warn(
-                "`defer_fields` is deprecated use `defer`", DeprecationWarning, stacklevel=2
-            )
-            defer = defer_fields
-        self._defer = set(defer)
-        self.embed_parent = embed_parent
-        self.embed_parent_filters: tuple[str, str | str] | None = None
+        self._only: set[str] = set()
+        self._defer: set[str] = set()
+        self._embed_parent: tuple[str, str | str] | None = None
+        self._embed_parent_filters: tuple[str, str | str] | None = None
         self.using_schema = using_schema
         self._extra_select = list(extra_select) if extra_select is not None else []
         self._reference_select = (
             reference_select.copy() if isinstance(reference_select, dict) else {}
         )
         self._exclude_secrets = exclude_secrets
-        self._cache = QueryModelResultCache(attrs=self.model_class.pkcolumns)
+        self._cache = QueryModelResultCache(attrs=self.pkcolumns)
         self._clear_cache(keep_result_cache=False)
         self._cached_select_related_expression: (
             tuple[Any, dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]]] | None
@@ -187,9 +149,6 @@ class BaseQuerySet(
             order_by=self._order_by,
             group_by=self._group_by,
             distinct=self.distinct_on,
-            only=self._only,
-            defer=self._defer,
-            embed_parent=self.embed_parent,
             using_schema=self.using_schema,
             table=getattr(self, "_table", None),
             exclude_secrets=self._exclude_secrets,
@@ -197,7 +156,10 @@ class BaseQuerySet(
             extra_select=self._extra_select,
         )
         queryset.or_clauses.extend(self.or_clauses)
-        queryset.embed_parent_filters = self.embed_parent_filters
+        queryset._embed_parent = self._embed_parent
+        queryset._embed_parent_filters = self._embed_parent_filters
+        queryset._only.update(self._only)
+        queryset._defer.update(self._defer)
         queryset._select_related.update(self._select_related)
         queryset._select_related_g_and_o.update(self._select_related_g_and_o)
         queryset._select_related_embedding.update(self._select_related_embedding)
@@ -303,7 +265,7 @@ class BaseQuerySet(
         clauses = []
         select_related: set[str] = set()
         cleaned_kwargs = clauses_mod.clean_query_kwargs(
-            self.model_class, kwargs, self.embed_parent_filters, model_database=self.database
+            self.model_class, kwargs, self._embed_parent_filters, model_database=self.database
         )
 
         for key, value in cleaned_kwargs.items():
@@ -372,7 +334,7 @@ class BaseQuerySet(
         crawl_result = clauses_mod.clean_path_to_crawl_result(
             self.model_class,
             path=order_by,
-            embed_parent=self.embed_parent_filters,
+            embed_parent=self._embed_parent_filters,
             model_database=self.database,
         )
         order_col = tables_and_models[crawl_result.forward_path][0].columns[
@@ -380,9 +342,7 @@ class BaseQuerySet(
         ]
         return order_col.desc() if reverse else order_col
 
-    def _update_select_related_weak(
-        self, fields: Iterable[str], *, cache_name: str, clear: bool
-    ) -> bool:
+    def _update_related_weak(self, fields: Iterable[str], *, cache_name: str, clear: bool) -> bool:
         """
         Update the select_related cache with cache_name. This is a special cache,
         which is directly used.
@@ -407,9 +367,22 @@ class BaseQuerySet(
                     clauses_mod.clean_path_to_crawl_result(
                         self.model_class,
                         path=field_name,
-                        embed_parent=self.embed_parent_filters,
+                        embed_parent=self._embed_parent_filters,
                         model_database=self.database,
                     ).forward_path
+                )
+            case "_only" | "_defer":
+                # crossing the db is no problem, it will just may not work.
+                # Because traverse_last is False it works. The last part is treated as field no matter
+                # if relationField or not
+                related_element_fn = lambda field_name: (
+                    clauses_mod.clean_path_to_crawl_result(
+                        self.model_class,
+                        path=field_name,
+                        embed_parent=self._embed_parent_filters,
+                        model_database=self.database,
+                        allow_crossing_db=True,
+                    ).forward_path_to_field
                 )
             case _:
                 raise QuerySetError(f"Invalid cache (`{cache_name}`) used.")
@@ -440,14 +413,10 @@ class BaseQuerySet(
             crawl_result = clauses_mod.clean_path_to_crawl_result(
                 self.model_class,
                 path=path,
-                embed_parent=self.embed_parent_filters,
+                embed_parent=self._embed_parent_filters,
                 model_database=self.database,
             )
-            related_element = (
-                crawl_result.field_name
-                if not crawl_result.forward_path
-                else f"{crawl_result.forward_path}__{crawl_result.field_name}"
-            )
+            related_element = crawl_result.forward_path_to_field
             if crawl_result.cross_db_remainder:
                 raise QuerySetError(
                     detail=f'Selected path "{related_element}" is on another database.'
@@ -465,7 +434,7 @@ class BaseQuerySet(
         crawl_result = clauses_mod.clean_path_to_crawl_result(
             self.model_class,
             path=distinct_on,
-            embed_parent=self.embed_parent_filters,
+            embed_parent=self._embed_parent_filters,
             model_database=self.database,
         )
         return tables_and_models[crawl_result.forward_path][0].columns[crawl_result.field_name]

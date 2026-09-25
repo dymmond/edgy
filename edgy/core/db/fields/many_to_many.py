@@ -191,7 +191,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             **kwargs,
         )
 
-    def traverse_field(self, path: str) -> tuple[Any, str, str]:
+    def traverse_field(self, path: str) -> tuple[type[BaseModelType], str, str]:
         """
         Traverses the field path for a Many-to-Many relationship.
 
@@ -203,7 +203,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         # empty string (new way and no embedding) is to use always owner
         if self.embed_through_prefix and path.startswith(self.embed_through_prefix):
             return (
-                self.through,  # The intermediate model.
+                cast("type[BaseModelType]", self.through),  # The intermediate model.
                 self.from_foreign_key,  # The foreign key from 'through' to 'owner'.
                 path.removeprefix(self.embed_through_prefix).removeprefix("__"),  # Remaining path.
             )
@@ -214,7 +214,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             f"{path.removeprefix(self.name).removeprefix('__')}",  # Remaining path.
         )
 
-    def reverse_traverse_field_fk(self, path: str) -> tuple[Any, str, str]:
+    def reverse_traverse_field_fk(self, path: str) -> tuple[type[BaseModelType], str, str]:
         """
         Traverses the field path in reverse for a Many-to-Many foreign key.
 
@@ -229,7 +229,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         ):
             # If embedding the through model, return the through model itself.
             return (
-                self.through,  # The model being traversed to.
+                cast("type[BaseModelType]", self.through),  # The model being traversed to.
                 self.to_foreign_key,  # The foreign key from 'through' to 'target'.
                 path.removeprefix(self.reverse_embed_through_prefix).removeprefix("__"),
             )
@@ -620,6 +620,9 @@ class ManyToManyField(ForeignKeyFieldFactory, list):
         embed_through = kwargs.get("embed_through")
         if embed_through and "__" in embed_through:
             raise FieldDefinitionError('"embed_through" cannot contain "__".')
+
+        if kwargs.get("primary_key"):
+            raise FieldDefinitionError("`primary_key=True` is not allowed for ManyToMany fields.")
 
         # Set default values specific to Many-to-Many fields.
         kwargs["null"] = True  # M2M fields are conceptually null until related.

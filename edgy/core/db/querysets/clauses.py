@@ -231,6 +231,7 @@ def clean_path_to_crawl_result(
     *,
     embed_parent: tuple[str, str] | None = None,
     model_database: Database | None = None,
+    allow_crossing_db: bool = False,
 ) -> RelationshipCrawlResult:
     """
     For use for cleaning field pathes without operator support (e.g. distinct, order_by, ...).
@@ -242,6 +243,7 @@ def clean_path_to_crawl_result(
     Kwargs:
         embed_parent (tuple[str, str] | None): Provide a embed_parent value from e.g. QuerySet.
         model_database (Database | None): Set the model_database.
+        allow_crossing_db (bool): Allow crossing the database.
     """
     # Crawl the relationship to find the relevant sub_model_class, field_name,
     # operator, related_string, and cross-database remainder.
@@ -251,6 +253,7 @@ def clean_path_to_crawl_result(
         embed_parent=embed_parent,
         model_database=model_database,
         callback_fn=_clean_path_validator,
+        allow_crossing_db=allow_crossing_db,
     )
     return crawl_result
 
@@ -340,7 +343,7 @@ def _calculate_select_related(queryset: QuerySetType, *, kwargs: dict[str, Any])
     cleaned_kwargs = clean_query_kwargs(
         queryset.model_class,
         kwargs,
-        queryset.embed_parent_filters,
+        queryset._embed_parent_filters,
         model_database=queryset.database,
     )
     # Iterate through the cleaned kwargs to identify relationship paths.
@@ -524,7 +527,7 @@ class _EnhancedClausesHelper:
             cleaned_kwargs = clean_query_kwargs(
                 queryset.model_class,
                 kwargs,
-                queryset.embed_parent_filters,
+                queryset._embed_parent_filters,
                 model_database=queryset.database,
             )
 

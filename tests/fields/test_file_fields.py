@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 from typing import Any
 from unittest.mock import call
 from uuid import uuid4
@@ -119,10 +120,18 @@ async def test_save_file_create(create_test_database):
         assert rob.read() == b"!# /bin/sh"
     path = model.file_field.path
     name = model.file_field.name
-    assert model.file_field.storage.get_accessed_time(name)
-    assert model.file_field.storage.get_modified_time(
-        name
-    ) >= model.file_field.storage.get_created_time(name)
+    stats = os.stat(model.file_field.storage.path(name))
+    # the floats must be the same, so no need to add an epsilon
+    assert model.file_field.storage.get_accessed_time(name) == datetime.fromtimestamp(
+        stats.st_atime, tz=timezone.utc
+    )
+    assert model.file_field.storage.get_modified_time(name) == datetime.fromtimestamp(
+        stats.st_mtime, tz=timezone.utc
+    )
+    if hasattr(stats, "st_birthtime"):
+        assert model.file_field.storage.get_created_time(name) == datetime.fromtimestamp(
+            stats.st_birthtime, tz=timezone.utc
+        )
     assert os.path.exists(path)
     assert model.file_field.storage.exists(model.file_field.name)
     model.file_field.delete()

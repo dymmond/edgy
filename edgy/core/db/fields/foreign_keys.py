@@ -284,7 +284,7 @@ class BaseForeignKeyField(BaseForeignKey):
         # The remaining path after stripping the current field's name.
         return self.target, self.reverse_name, path.removeprefix(self.name).removeprefix("__")
 
-    def reverse_traverse_field(self, path: str) -> tuple[Any, str, str]:
+    def reverse_traverse_field(self, path: str) -> tuple[type[BaseModelType], str, str]:
         """
         Traverses the field path in reverse (from the related model back to the owner).
 

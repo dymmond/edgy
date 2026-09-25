@@ -448,7 +448,7 @@ async def test_relation_load(create_test_database, subtests):
     await Track.query.delete()
 
 
-async def test_assertation_error_on_embed_through_double_underscore_attr():
+async def test_error_on_embed_through_double_underscore_attr():
     with pytest.raises(FieldDefinitionError) as raised:
 
         class MyModel(edgy.StrictModel):
@@ -458,3 +458,15 @@ async def test_assertation_error_on_embed_through_double_underscore_attr():
             model = edgy.ManyToMany(MyModel, embed_through="foo__attr")
 
     assert raised.value.args[0] == '"embed_through" cannot contain "__".'
+
+
+async def test_error_on_primary_key():
+    with pytest.raises(FieldDefinitionError) as raised:
+
+        class MyModel(edgy.StrictModel):
+            is_active = edgy.BooleanField(default=True)
+
+        class MyOtherModel(edgy.StrictModel):
+            model = edgy.ManyToMany(MyModel, primary_key=True, embed_through="attr")
+
+    assert raised.value.args[0] == "`primary_key=True` is not allowed for ManyToMany fields."

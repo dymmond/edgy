@@ -109,7 +109,7 @@ class QueryExecutor(Generic[EdgyModel, EdgyEmbedTarget]):
                 yield result
             return
 
-        if qs.embed_parent:
+        if qs._embed_parent:
             qs = qs.distinct()
 
         expression, tables_and_models = await qs.as_select_with_tables()
@@ -281,7 +281,7 @@ class QueryExecutor(Generic[EdgyModel, EdgyEmbedTarget]):
             if self.queryset._batch_size is not None
             else self.queryset.all()
         )
-        queryset.embed_parent = None
+        queryset._embed_parent = None
         row_count = 0
 
         executor: QueryExecutor[EdgyModel, EdgyEmbedTarget] = QueryExecutor(queryset)

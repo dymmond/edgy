@@ -383,8 +383,8 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
             for col in self.model_class.meta.field_to_column_names[field]
         }
 
-        can_result_cache = not self.owner.embed_parent
-        if self.resolve_embed and queryset.embed_parent:
+        can_result_cache = not self.owner._embed_parent
+        if self.resolve_embed and queryset._embed_parent:
             # check if all are elligable and can be resolved
             if not all(
                 res[0] is None or res[0].can_load or res[1] for res in self.instances_and_created
@@ -417,7 +417,7 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
                     )
                 )
             if self.ignore_create_conflicts or (
-                self.resolve_embed and queryset.embed_parent and not item[0].can_load
+                self.resolve_embed and queryset._embed_parent and not item[0].can_load
             ):
                 try:
                     cm = AsyncExitStack()
@@ -615,7 +615,7 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
                         )
         finally:
             CURRENT_INSTANCE.reset(token)
-        if queryset.embed_parent and self.resolve_embed:
+        if queryset._embed_parent and self.resolve_embed:
             immediate = await run_concurrently(
                 [queryset._embed_parent_in_result(tup[0]) for tup in self.instances_and_created],
                 limit=concurrent_limit,
@@ -648,7 +648,7 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
         if self.execution_step >= 4:
             raise Exception("Was already executed")
         self.execution_step = 4
-        if self.resolve_embed and self.owner.embed_parent:
+        if self.resolve_embed and self.owner._embed_parent:
             # embed can be None so only check None from instances if the entry really not exists
             immediate = [
                 tup
@@ -667,7 +667,7 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
                     for item in immediate
                 ],
             )
-        elif not self.owner.embed_parent:
+        elif not self.owner._embed_parent:
             self.owner._cache.update(
                 self.model_class,
                 [

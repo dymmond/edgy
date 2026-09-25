@@ -200,6 +200,8 @@ async def test_many_to_many_many_fields():
 
     assert len(total_users) == 3
     assert total_users[0].get_real_class() is User
+    # should be instance of User without proxy
+    assert isinstance(total_users[0], User)
     assert total_users[0].pk == user1.pk
     assert total_users[1].pk == user2.pk
     assert total_users[2].pk == user3.pk

@@ -21,6 +21,22 @@ class User(edgy.StrictModel):
         registry = models
 
 
+class Profile(edgy.StrictModel):
+    user = edgy.ForeignKey(User, primary_key=True)
+    name = edgy.CharField(max_length=100)
+
+    class Meta:
+        registry = models
+
+
+class Group(edgy.StrictModel):
+    users = edgy.ManyToMany(User)
+    name = edgy.CharField(max_length=100)
+
+    class Meta:
+        registry = models
+
+
 @pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
     async with database:
@@ -39,32 +55,59 @@ async def test_raise_QuerySetError_on_only_and_defer():
         edgy.run_sync(User.query.only("name").defer("language"))
 
 
-async def test_model_only():
-    john = edgy.run_sync(
+@pytest.mark.parametrize(
+    "query_fn,single_result",
+    [
+        pytest.param(
+            lambda group: User.query.only("name", "language").order_by("id"), False, id="direct"
+        ),
+        pytest.param(
+            lambda group: (
+                Profile.query.update_embed_parent(("user", ""))
+                .only("user__name", "user__language")
+                .order_by("user__id")
+            ),
+            True,
+            id="single",
+        ),
+        pytest.param(
+            lambda group: group.users.only("name", "language").order_by("id"), False, id="multi"
+        ),
+    ],
+)
+async def test_only(query_fn, single_result):
+    user1 = edgy.run_sync(
         User.query.create(name="John", language="PT", description="A simple description")
     )
-    jane = edgy.run_sync(
+    user2 = edgy.run_sync(
         User.query.create(name="Jane", language="EN", description="Another simple description")
     )
-    users = edgy.run_sync(User.query.only("name", "language"))
+    edgy.run_sync(Profile.query.create(user=user1, name="A profile"))
+    group = edgy.run_sync(Group.query.create(users=[user1, user2], name="A group"))
+    users = edgy.run_sync(query_fn(group))
 
-    assert len(users) == 2
-    assert [user.id for user in users] == [john.pk, jane.pk]
+    assert len(users) == (1 if single_result else 2)
+    assert users[0].model_dump() == {"id": 1, "name": "John", "language": "PT"}
 
-    john = users[0]
+    if not single_result:
+        assert "description" not in users[1].model_dump()
+
+    users[0].description  # noqa
+    if not single_result:
+        users[1].description  # noqa
+
+    assert "description" in users[0].model_dump()
+    if not single_result:
+        assert "description" in users[1].model_dump()
+
+    users = edgy.run_sync(query_fn(group))
+
+    assert "description" not in users[0].model_dump()
+    if not single_result:
+        assert "description" not in users[1].model_dump()
 
 
-async def test_model_only_attribute_error():
-    john = edgy.run_sync(User.query.create(name="John", language="PT"))
-    users = edgy.run_sync(User.query.only("name", "language"))
-
-    assert len(users) == 1
-    assert users[0].pk == john.pk
-
-    assert "description" not in john.model_dump()
-
-
-async def test_model_only_with_all():
+async def test_only_with_all():
     edgy.run_sync(User.query.create(name="John", language="PT"))
     edgy.run_sync(
         User.query.create(name="Jane", language="EN", description="Another simple description")
@@ -75,7 +118,7 @@ async def test_model_only_with_all():
     assert len(users) == 2
 
 
-async def test_model_only_with_filter():
+async def test_only_with_filter():
     edgy.run_sync(User.query.create(name="John", language="PT"))
     edgy.run_sync(
         User.query.create(name="Jane", language="EN", description="Another simple description")
@@ -94,7 +137,7 @@ async def test_model_only_with_filter():
     assert len(users) == 0
 
 
-async def test_model_only_with_exclude():
+async def test_only_with_exclude():
     edgy.run_sync(User.query.create(name="John", language="PT"))
     edgy.run_sync(
         User.query.create(name="Jane", language="EN", description="Another simple description")
@@ -113,7 +156,7 @@ async def test_model_only_with_exclude():
     assert len(users) == 0
 
 
-async def test_model_only_save():
+async def test_only_save():
     edgy.run_sync(User.query.create(name="John", language="PT"))
 
     user = edgy.run_sync(User.query.filter(pk=1).only("name", "language").get())
@@ -128,7 +171,7 @@ async def test_model_only_save():
     assert user.language == "EN"
 
 
-async def test_model_only_save_without_nullable_field():
+async def test_only_save_without_nullable_field():
     user = edgy.run_sync(User.query.create(name="John", language="PT", description="John"))
 
     assert user.description == "John"

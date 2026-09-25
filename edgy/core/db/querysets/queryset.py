@@ -346,7 +346,8 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             sqlalchemy.sql.expression.BinaryExpression
             | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
         ]
-        | dict[str, Any],
+        | dict[str, Any]
+        | QuerySetType,
         **kwargs: Any,
     ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
@@ -534,12 +535,12 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         """
         queryset: QuerySet = self._clone()
         queryset._order_by = order_by
-        if queryset._update_select_related_weak(
+        if queryset._update_related_weak(
             (x.removeprefix("-") for x in order_by),
             cache_name="_select_related_g_and_o",
             clear=True,
         ):
-            queryset._update_select_related_weak(
+            queryset._update_related_weak(
                 queryset._group_by,
                 cache_name="_select_related_g_and_o",
                 clear=False,
@@ -557,10 +558,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         Returns:
             A new QuerySet clone with the reversed ordering.
         """
-        if not self._order_by:
-            queryset = self.order_by(*self.model_class.pkcolumns)
-        else:
-            queryset = self._clone()
+        queryset = self.order_by(*self.pkcolumns) if not self._order_by else self._clone()
         queryset._order_by = tuple(
             el[1:] if el.startswith("-") else f"-{el}" for el in queryset._order_by
         )
@@ -618,10 +616,10 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         """
         queryset: QuerySet = self._clone()
         queryset._group_by = group_by
-        if queryset._update_select_related_weak(
+        if queryset._update_related_weak(
             group_by, cache_name="_select_related_g_and_o", clear=True
         ):
-            queryset._update_select_related_weak(
+            queryset._update_related_weak(
                 (x.lstrip("-") for x in queryset._order_by),
                 cache_name="_select_related_g_and_o",
                 clear=False,
@@ -660,22 +658,13 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         The primary key is automatically included to ensure object identity and saving functionality.
 
         Args:
-            *fields: The names of the model fields (columns) to include in the SELECT statement.
+            *fields: The names of the model fields and columns to include in the SELECT statement.
 
         Returns:
             A new QuerySet clone with the `_only` set attribute containing the selected fields.
         """
         queryset: QuerySet = self._clone()
-        only_fields: set[str] = set(fields)
-        if self.model_class.pknames:
-            for pkname in self.model_class.pknames:
-                if pkname not in fields:
-                    for pkcolumn in self.model_class.meta.get_columns_for_name(pkname):
-                        only_fields.add(pkcolumn.key)
-        else:
-            for pkcolumnname in self.model_class.pkcolumns:
-                only_fields.add(pkcolumnname)
-        queryset._only = only_fields
+        queryset._update_related_weak(fields, cache_name="_only", clear=True)
         return queryset
 
     def defer(self, *fields: str) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
@@ -693,8 +682,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             A new QuerySet clone with the `_defer` set attribute containing the fields to skip.
         """
         queryset: QuerySet = self._clone()
-
-        queryset._defer = set(fields)
+        queryset._update_related_weak(fields, cache_name="_defer", clear=True)
         return queryset
 
     def select_related(
@@ -884,7 +872,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         # Build COUNT expression
         if needs_distinct:
             # Support composite primary keys if present
-            pk_cols = [subquery.c[col] for col in queryset.model_class.pkcolumns]
+            pk_cols = [subquery.c[col] for col in queryset.pkcolumns]
             if len(pk_cols) == 1:
                 count_expr = sqlalchemy.func.count(sqlalchemy.distinct(pk_cols[0]))
             else:
@@ -956,7 +944,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             return self._cache_first[1]
         queryset = self
         if not queryset._order_by:
-            queryset = queryset.order_by(*self.model_class.pkcolumns)
+            queryset = queryset.order_by(*self.pkcolumns)
         expression, tables_and_models = await queryset.as_select_with_tables()
         # this works, because in case of no order_by, the inserted default order doesn't produce
         # extra selections
@@ -983,7 +971,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             return self._cache_last[1]
         queryset = self
         if not queryset._order_by:
-            queryset = queryset.order_by(*self.model_class.pkcolumns)
+            queryset = queryset.order_by(*self.pkcolumns)
         queryset = queryset.reverse()
         expression, tables_and_models = await queryset.as_select_with_tables()
         # this works, because in case of no order_by, the inserted default order doesn't produce
@@ -1360,7 +1348,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         """
         operation = BulkOperation(
             owner=self,
-            unique_columns=self.model_class.pkcolumns,
+            unique_columns=self.pkcolumns,
             create=True,
             update=False,
             retrieve=False,
@@ -1448,7 +1436,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         _unique_fields: set[str] = set()
         _unique_columns: Sequence[str]
         if unique_fields is None:
-            _unique_columns = self.model_class.pkcolumns
+            _unique_columns = self.pkcolumns
         else:
             _unique_fields = set(unique_fields)
             if not _unique_fields:
@@ -1555,7 +1543,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         _unique_fields: set[str] = set()
         _unique_columns: set[str]
         if unique_fields is None:
-            _unique_columns = set(self.model_class.pkcolumns)
+            _unique_columns = set(self.pkcolumns)
         else:
             _unique_fields = set(unique_fields)
             if not _unique_fields:
@@ -1574,7 +1562,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             if update_fields is None
             else set(update_fields)
         )
-        unique_equals_pk = set(self.model_class.pkcolumns) == _unique_columns
+        unique_equals_pk = set(self.pkcolumns) == _unique_columns
         operation = BulkOperation(
             owner=self,
             signal_postfix="bulk",
@@ -1657,8 +1645,8 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         _unique_fields: set[str] = set()
         _unique_columns: Collection[str]
         if unique_fields is None:
-            _unique_fields = set(self.model_class.pknames)
-            _unique_columns = self.model_class.pkcolumns
+            _unique_fields = set(self.pknames)
+            _unique_columns = self.pkcolumns
         else:
             _unique_fields = set(unique_fields)
             if not _unique_fields:

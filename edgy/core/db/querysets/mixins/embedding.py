@@ -223,10 +223,10 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                 tables_and_models = (await self_queryset.as_select_with_tables())[1]
             # apply embedding
             prefetched_instance = result
-            if self_queryset.embed_parent_filters and self_queryset.embed_parent_filters[0]:
+            if self_queryset._embed_parent_filters:
                 token = MODEL_GETATTR_BEHAVIOR.set("coro")
                 try:
-                    for part in self_queryset.embed_parent_filters[0].split("__"):
+                    for part in self_queryset._embed_parent_filters[0].split("__"):
                         prefetched_instance = getattr(prefetched_instance, part)
                         if isawaitable(prefetched_instance):
                             prefetched_instance = await prefetched_instance
@@ -238,22 +238,22 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                 mapping=mapping,
                 tables_and_models=tables_and_models,
             )
-        if not self_queryset.embed_parent:
+        if not self_queryset._embed_parent:
             return result, cast("EdgyEmbedTarget", result)
         prefix = ""
         token = MODEL_GETATTR_BEHAVIOR.set("coro")
         try:
             new_result: Any = result
-            for part in self_queryset.embed_parent[0].split("__"):
+            for part in self_queryset._embed_parent[0].split("__"):
                 prefix = f"{prefix}__{part}" if prefix else part
                 new_result = getattr(new_result, part)
                 if isawaitable(new_result):
                     new_result = await new_result
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
-        if self_queryset.embed_parent[1]:
+        if self_queryset._embed_parent[1]:
             # this works also on strict models
-            object.__setattr__(new_result, self_queryset.embed_parent[1], result)
+            object.__setattr__(new_result, self_queryset._embed_parent[1], result)
         return result, new_result
 
     def _prepare_prefetches_for_rows(
@@ -297,7 +297,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             anchor_crawl_result = crawl_relationship(
                 self_queryset.model_class,
                 prefetch.from_anchor,
-                embed_parent=self_queryset.embed_parent_filters,
+                embed_parent=self_queryset._embed_parent_filters,
                 model_database=self_queryset.database,
                 # allow_crossing_db=True,
                 traverse_last=True,
@@ -407,11 +407,11 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
         queryset._prefetch_related = [*self_queryset._prefetch_related, *prefetch]
         select_pathes: set[str] = set()
         # this one extra doesn't matter much from performance perspective, is maybe even cheaper
-        if queryset.embed_parent and queryset.embed_parent[0]:
+        if queryset._embed_parent:
             # can be cross db, so only add the first expanded part
             crawl_result = crawl_relationship(
                 queryset.model_class,
-                queryset.embed_parent[0],
+                queryset._embed_parent[0],
                 model_database=queryset.database,
                 traverse_last=True,
             )
@@ -423,8 +423,8 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                 for prefetch in queryset._prefetch_related
             )
         )
-        # they are sanitized and analyzed later in _update_select_related_weak
-        queryset._update_select_related_weak(
+        # they are sanitized and analyzed later in _update_related_weak
+        queryset._update_related_weak(
             select_pathes, cache_name="_select_related_embedding", clear=True
         )
         return queryset
@@ -448,21 +448,26 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             QuerySetType: A new QuerySet instance with the new embedding.
         """
         self_queryset = cast("QuerySet[EdgyModel, EdgyEmbedTarget]", self)
+        if embed_parent is not None:
+            if len(cast(tuple, embed_parent)) != 2:
+                raise ValueError("Provided tuple has not exactly two elements.")
+            if not embed_parent[0]:
+                raise ValueError("First argument in `embed_parent` tuple can't be empty.")
         queryset = self_queryset._clone()
-        queryset.embed_parent = embed_parent
+        queryset._embed_parent = embed_parent
         select_pathes: set[str] = set()
-        if queryset.embed_parent and queryset.embed_parent[0]:
+        if queryset._embed_parent:
             # can be cross db, so only add the first expanded part
             crawl_result = crawl_relationship(
                 queryset.model_class,
-                queryset.embed_parent[0],
+                queryset._embed_parent[0],
                 model_database=queryset.database,
                 traverse_last=True,
             )
             select_pathes.add(crawl_result.forward_path)
 
         if (
-            queryset._update_select_related_weak(
+            queryset._update_related_weak(
                 select_pathes,
                 cache_name="_select_related_embedding",
                 clear=True,
@@ -471,7 +476,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
         ):
             # regenerate prefetch pathes
 
-            queryset._update_select_related_weak(
+            queryset._update_related_weak(
                 chain(
                     *(
                         prefetch._generate_select_related_pathes(queryset)

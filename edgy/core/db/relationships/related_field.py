@@ -186,7 +186,7 @@ class RelatedField(RelationshipField):
         # Cast the field to BaseForeignKeyField as it's known to be a foreign key.
         return cast(BaseForeignKeyField, self.related_from.meta.fields[self.foreign_key_name])
 
-    def traverse_field(self, path: str) -> tuple[Any, str, str]:
+    def traverse_field(self, path: str) -> tuple[type[BaseModelType], str, str]:
         """
         Traverses the field path in reverse, delegating the traversal to the
         underlying foreign key. This is used for complex query constructions
@@ -196,7 +196,7 @@ class RelatedField(RelationshipField):
             path (str): The path to traverse within the related field.
 
         Returns:
-            tuple[Any, str, str]: A tuple containing the traversed field, the
+            tuple[type[BaseModelType], str, str]: A tuple containing the traversed field, the
                                   remaining path, and the original path segment.
         """
         return self.foreign_key.reverse_traverse_field(path)

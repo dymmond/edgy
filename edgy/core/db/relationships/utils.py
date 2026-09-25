@@ -78,6 +78,11 @@ class RelationshipCrawlResult:
             self.cross_db_remainder,
         )[key]
 
+    @property
+    def forward_path_to_field(self) -> str:
+        """Helper for combining both parts."""
+        return f"{self.forward_path}__{self.field_name}" if self.forward_path else self.field_name
+
 
 def crawl_relationship(
     model_class: type[BaseModelType],

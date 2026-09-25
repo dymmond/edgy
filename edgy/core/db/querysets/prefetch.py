@@ -160,7 +160,7 @@ class Prefetch:
                 queryset.model_class,
                 anchor_forward_path,
                 model_database=queryset.database,
-                embed_parent=queryset.embed_parent_filters,
+                embed_parent=queryset._embed_parent_filters,
                 traverse_last=True,
                 allow_crossing_db=False,
             )
@@ -177,7 +177,7 @@ class Prefetch:
                 queryset.model_class,
                 self.to_attr,
                 model_database=queryset.database,
-                embed_parent=queryset.embed_parent_filters,
+                embed_parent=queryset._embed_parent_filters,
                 allow_crossing_db=True,
             )
             # for cross db requests this is okay
