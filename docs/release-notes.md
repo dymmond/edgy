@@ -32,6 +32,8 @@
   Replace idioms `isinstance(user, User)` with `user.get_real_class() is User` for maximal compatibility.
 - Deprecate setting attributes on `QuerySet` via keywords (except `model_class` and `using_schema`).
 - Deprecate passing `model_class` to `QuerySet` as positional argument. Use keywords instead.
+- Calling `only` without arguments, reset the selected fields instead of setting them to `pknames` and `pkcolumns`.
+  This behavior matches the one of `defer`.
 
 ### Fixed
 
