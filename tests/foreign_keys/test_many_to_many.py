@@ -130,11 +130,28 @@ async def test_add_many_to_many_create():
     assert await album.tracks.create(title="The Bird", position=1)
     assert await album.tracks.create(title="Heart don't stand a chance", position=2)
     await album.tracks.create(title="The Waters", position=3)
-    # we can't rebase yet
     assert await album.tracks.get_or_create(
         {"track": {"title": "The Waters", "position": 30}}, title="The Waters"
     )
 
+    total_tracks = await album.tracks.order_by("position")
+    assert len(total_tracks) == 3
+    for track in total_tracks:
+        assert track.embedded.album.pk == album.pk
+    assert total_tracks[2].position == 3
+
+
+async def test_add_many_to_many_bulk_create():
+    await Album.query.create(name="Fake")
+
+    album = await Album.query.create(name="Malibu")
+    assert await album.tracks.bulk_create(
+        [
+            {"title": "The Bird", "position": 1},
+            {"title": "Heart don't stand a chance", "position": 2},
+            Track.proxy_model(title="The Waters", position=3),
+        ]
+    )
     total_tracks = await album.tracks.order_by("position")
     assert len(total_tracks) == 3
     for track in total_tracks:

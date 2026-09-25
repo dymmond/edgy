@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import warnings
 from collections.abc import (
     AsyncIterator,
@@ -53,6 +54,23 @@ _injected_filters_deletion: ContextVar[Iterable] = ContextVar(
 )
 
 
+def _deprecated_init_fixup(fn: Any) -> Callable:
+    @functools.wraps(fn)
+    def _(self: Any, *args: Any, **kwargs: Any) -> None:
+        if args:
+            warnings.warn(
+                "`model_class` is now keyword-only.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            kwargs["model_class"] = args[0]
+            fn(self, *args[1:], **kwargs)
+        else:
+            fn(self, *args, **kwargs)
+
+    return _
+
+
 class BaseQuerySet(
     TenancyMixin[EdgyModel, EdgyEmbedTarget],
     EmbeddingMixin[EdgyModel, EdgyEmbedTarget],
@@ -65,7 +83,10 @@ class BaseQuerySet(
     This is now a "Facade" that holds state and delegates work.
     """
 
-    def __init__(self, model_class: type[EdgyModel], **kwargs: Any) -> None:
+    @_deprecated_init_fixup
+    def __init__(
+        self, *, model_class: type[EdgyModel], using_schema: None | str, **kwargs: Any
+    ) -> None:
         # ensure only the real model_class is used here not a proxy
         if model_class.__is_proxy_model__:
             model_class = cast(type[EdgyModel], model_class.__parent__)
@@ -75,7 +96,7 @@ class BaseQuerySet(
             warnings.warn(
                 "Assigning attributes to QuerySet via `__init__` is deprecated and partially broken. "
                 "Use methods and when possible attributes on the instance instead. "
-                "The only valid positional and keyword argument is `model_class`.",
+                "The only valid keyword only arguments are `model_class` and `using_schema`.",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -111,7 +132,7 @@ class BaseQuerySet(
         self._defer: set[str] = set()
         self._embed_parent: tuple[str, str | str] | None = None
         self._embed_parent_filters: tuple[str, str | str] | None = None
-        self.using_schema: str | None | Any = kwargs.get("using_schema")
+        self.using_schema: str | None | Any = using_schema
         self._extra_select: Iterable[sqlalchemy.ClauseElement] | None = tuple(
             kwargs.get("extra_select", _empty_set)
         )
@@ -137,7 +158,7 @@ class BaseQuerySet(
     def _create_clone_instance(self) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """Base instance which is decorated later in clone."""
         return cast("type[QuerySet]", type(self))(
-            self.model_class,
+            model_class=self.model_class, using_schema=self.using_schema
         )
 
     def _clone(self) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
@@ -149,10 +170,9 @@ class BaseQuerySet(
         queryset = self._create_clone_instance()
         queryset._database = getattr(self, "_database", None)
         queryset._table = getattr(self, "_table", None)
-        queryset.using_schema = self.using_schema
         queryset._prefetch_related = self._prefetch_related
         queryset._exclude_secrets = self._exclude_secrets
-        # copying won't work, we need a deep copy
+        # copying won't work, we would need a deep copy but not necessary anyway
         queryset._reference_select = self._reference_select
         queryset._offset = self._offset
         # tuple, so we can just move it
@@ -167,6 +187,7 @@ class BaseQuerySet(
         queryset._batch_size = self._batch_size
         queryset.filter_clauses.extend(self.filter_clauses)
         queryset.or_clauses.extend(self.or_clauses)
+        # this handles the create arguments
         queryset._injected_create_handler = self._injected_create_handler
         queryset._embed_parent = self._embed_parent
         queryset._embed_parent_filters = self._embed_parent_filters
@@ -175,6 +196,7 @@ class BaseQuerySet(
         queryset._select_related.update(self._select_related)
         queryset._select_related_g_and_o.update(self._select_related_g_and_o)
         queryset._select_related_embedding.update(self._select_related_embedding)
+        # by default this is copied, we need to clear it when select_related caches are changing
         queryset._cached_select_related_expression = self._cached_select_related_expression
         queryset._for_update = self._for_update
         return cast("QuerySet", queryset)

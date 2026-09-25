@@ -17,6 +17,7 @@ import sqlalchemy
 from sqlalchemy.exc import IntegrityError
 
 from edgy.core.db.context_vars import CURRENT_INSTANCE, MODEL_GETATTR_BEHAVIOR
+from edgy.core.db.models.utils import apply_instance_extras
 from edgy.core.utils.concurrency import run_concurrently
 from edgy.core.utils.db import check_db_connection
 from edgy.exceptions import QuerySetError, SkipOperation
@@ -173,7 +174,9 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
                     created = cast(
                         "EdgyModel",
                         self.owner._injected_create_handler(
-                            {k: v for k, v in obj.items() if k in self.model_class.meta.fields}, []
+                            # this dict is rebased, so we don't know the fields.
+                            {k: v for k, v in obj.items() if "__" not in k},
+                            [],
                         ),
                     )
                 else:
@@ -182,8 +185,18 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
                     )
                 self.create_params.append((created, pos, set(obj.keys())))
             else:
-                created = obj
+                if self.owner._injected_create_handler:
+                    created = cast("EdgyModel", self.owner._injected_create_handler(obj, []))
+                else:
+                    created = obj
                 self.create_params.append((created, pos, set(obj.meta.fields.keys())))
+            apply_instance_extras(
+                created,
+                self.model_class,
+                schema=self.owner.using_schema,
+                table=self.owner.table,
+                database=self.owner.database,
+            )
             if lookup_key:
                 self.existing_records[lookup_key] = created
             return created, True

@@ -29,8 +29,8 @@ class CombinedQuerySet(QuerySet):
         *,
         op: str = "union",
     ) -> None:
-        # initialize as a normal QuerySet bound to the same model/database
-        super().__init__(model_class=left.model_class)
+        # initialize as a normal QuerySet bound to the same model/database and schema
+        super().__init__(model_class=left.model_class, using_schema=left.using_schema)
         self.database = left.database
         # can't do this here
         self._injected_create_handler = None
@@ -41,10 +41,6 @@ class CombinedQuerySet(QuerySet):
 
         # update attrs used for caching
         self._cache.attrs = self.pkcolumns
-
-        # carry over schema from the left side
-        self.using_schema = left.using_schema
-        self.active_schema = self.get_schema()
 
         # safety & consistency checks
         if left.model_class is not right.model_class:
@@ -57,12 +53,8 @@ class CombinedQuerySet(QuerySet):
         #     raise QuerySetError(
         #         detail="CombinedQuerySet requires both sides to have the same pkcolumns."
         #     )
-
-        if getattr(left.database, "dsn", None) != getattr(right.database, "dsn", None):  # noqa
-            if getattr(left.database, "url", None) != getattr(right.database, "url", None):
-                raise QuerySetError(
-                    detail="Both querysets must be on the same database connection."
-                )
+        if str(left.database.url) != str(right.database.url):
+            raise QuerySetError(detail="Both querysets must be on the same database connection.")
 
     def _build_select_distinct(
         self,
