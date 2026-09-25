@@ -97,6 +97,44 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         ...
 
     @abstractmethod
+    def select_for_update(
+        self,
+        *,
+        nowait: bool = False,
+        skip_locked: bool = False,
+        read: bool = False,
+        key_share: bool = False,
+        of: Sequence[type[BaseModelType]] | None = None,
+    ) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
+        """
+        Abstract method to request row-level locks on the rows selected by this queryset, using
+        dialect-appropriate SELECT ... FOR UPDATE semantics via SQLAlchemy's
+        `with_for_update()`.
+
+        Args:
+            nowait (bool): Fail immediately if a lock cannot be acquired.
+            skip_locked (bool): Skip rows that are locked by other transactions (where supported).
+            read (bool): Shared lock variant (PostgreSQL's FOR SHARE).
+            key_share (bool):PostgreSQL's FOR KEY SHARE.
+            of (Sequence[type[BaseModelType]] | None): Models whose tables should be explicitly locked
+                (PostgreSQL's OF ...). The models must be part of the FROM/JOIN set for this query.
+
+        Notes:
+            - Most databases require running inside an explicit transaction:
+                  async with database.transaction():
+                      ...
+            - On unsupported dialects (e.g. SQLite), this is a no-op.
+            - For PostgreSQL, `read=True` maps to FOR SHARE and `key_share=True` to FOR KEY SHARE.
+            - `of=[ModelA, ...]` restricts locking to specific tables (PostgreSQL only).
+              You should include related models in the query via `select_related(...)`
+              if you plan to lock them with `of=...`.
+
+        Returns:
+            QuerySet: A cloned queryset with locking enabled.
+        """
+        ...
+
+    @abstractmethod
     def filter(
         self,
         *clauses: sqlalchemy.sql.expression.BinaryExpression
