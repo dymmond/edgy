@@ -74,7 +74,7 @@ Beyond referencing child-parent structures, you can reference arbitrary select s
 **Explanation:**
 
 -   `extra_select` allows you to include custom SQL expressions or subqueries in your query results.
--   You can add multiple `extra_select` entries, each with a unique label to prevent collisions.
+-   You can add multiple `extra_select` entries, each with a unique label to prevent collisions. `extra_select` calls stack by default. You can however reset by adding `replace=True` as keyword.
 -   This provides flexibility to include calculated values or data from other tables that are not directly related through model relationships.
 -   The example shows how to add a subquery that counts the number of posts associated with each user.
 

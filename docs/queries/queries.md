@@ -901,7 +901,7 @@ The `values_list()` can also be combined with `filter`, `only`, `exclude` as per
 
 ### Only
 
-Returns the results containing **only** the fields in the query and nothing else.
+Returns the results containing **only** the fields in the query and nothing else. It replaces the former `only()` set.
 
 ```python
 await User.query.create(name="John", email="foo@bar.com")
@@ -911,6 +911,9 @@ user = await User.query.only("name")
 
 !!! Warning
     You can only use `only()` or `defer()` but not both combined or a `QuerySetError` is raised.
+
+!!! Note
+    You can reset the selected fields by calling `only()` without arguments. Afterwards `defer` will work again.
 
 ### Defer
 
@@ -924,6 +927,10 @@ user = await User.query.defer("name")
 
 !!! Warning
     You can only use `only()` or `defer()` but not both combined or a `QuerySetError` is raised.
+
+!!! Note
+    You can reset the deferred field by calling `defer()` without arguments. Afterwards you can use `only`
+
 
 ### Get or none
 

@@ -111,8 +111,10 @@ class Manager(BaseManager):
             using_schema = self.owner.__using_schema__
             database = self.owner.database
 
-        # Return a new QuerySet initialized with the owner, schema, and database.
-        return self.queryset_class(self.owner, using_schema=using_schema, database=database)
+        # Return a new QuerySet initialized with the owner (model class), schema, and database.
+        queryset = self.queryset_class(model_class=self.owner, using_schema=using_schema)
+        queryset.database = database
+        return queryset
 
     def __getattr__(self, name: str) -> Any:
         """
@@ -133,8 +135,8 @@ class Manager(BaseManager):
             AttributeError: If the attribute does not exist on either the queryset
                             or the owner model.
         """
-        # Prevent infinite recursion and access to internal attributes or the manager's own name.
-        if name.startswith("_") or name == self.name:
+        # Prevent looking up internal attributes for QuerySet or Model.
+        if name.startswith("_"):
             return super().__getattr__(name)
         if name == "model_class":
             # legacy fallback
@@ -145,6 +147,9 @@ class Manager(BaseManager):
             # methods like .filter(), .get() to be called directly on the manager.
             return getattr(queryset, name)
         except AttributeError:
+            # prevent infinite recursion
+            if name == self.name:
+                raise
             # If the attribute is not found on the queryset, try to get it from the owner model.
             return getattr(self.owner, name)
 

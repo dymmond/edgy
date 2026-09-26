@@ -104,8 +104,6 @@ print(profile.user.email)  # foo@bar.com
 # but with sparse
 profile = await Profile.query.select_related("user__company", sparse=True).get(id=1)
 assert "email" not in profile.user.__dict__  # but will load eventually with a performance hit
-
-
 ```
 
 ### Access Foreign Key Values Directly from the Model

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import functools
+import warnings
 from collections.abc import (
     AsyncIterator,
     Awaitable,
@@ -14,7 +16,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Generic,
-    Literal,
     cast,
 )
 
@@ -53,6 +54,23 @@ _injected_filters_deletion: ContextVar[Iterable] = ContextVar(
 )
 
 
+def _deprecated_init_fixup(fn: Any) -> Callable:
+    @functools.wraps(fn)
+    def _(self: Any, *args: Any, **kwargs: Any) -> None:
+        if args:
+            warnings.warn(
+                "`model_class` is now keyword-only.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            kwargs["model_class"] = args[0]
+            fn(self, *args[1:], **kwargs)
+        else:
+            fn(self, *args, **kwargs)
+
+    return _
+
+
 class BaseQuerySet(
     TenancyMixin[EdgyModel, EdgyEmbedTarget],
     EmbeddingMixin[EdgyModel, EdgyEmbedTarget],
@@ -65,58 +83,61 @@ class BaseQuerySet(
     This is now a "Facade" that holds state and delegates work.
     """
 
+    @_deprecated_init_fixup
     def __init__(
-        self,
-        model_class: type[EdgyModel],
-        *,
-        database: Database | None = None,
-        filter_clauses: Iterable[Any] = _empty_set,
-        prefetch_related: Iterable[Prefetch] = _empty_set,
-        limit: int | None = None,
-        offset: int | None = None,
-        batch_size: int | None = None,
-        order_by: Iterable[str] = _empty_set,
-        group_by: Iterable[str] = _empty_set,
-        distinct: None | Literal[True] | Iterable[str] = None,
-        using_schema: str | None | Any = Undefined,
-        table: sqlalchemy.Table | None = None,
-        exclude_secrets: bool = False,
-        extra_select: Iterable[sqlalchemy.ClauseElement] | None = None,
-        reference_select: reference_select_type | None = None,
+        self, *, model_class: type[EdgyModel], using_schema: None | str, **kwargs: Any
     ) -> None:
         # ensure only the real model_class is used here not a proxy
         if model_class.__is_proxy_model__:
             model_class = cast(type[EdgyModel], model_class.__parent__)
 
         super().__init__(model_class=model_class)
-        self.filter_clauses: list[Any] = list(filter_clauses)
+        if kwargs:
+            warnings.warn(
+                "Assigning attributes to QuerySet via `__init__` is deprecated and partially broken. "
+                "Use methods and when possible attributes on the instance instead. "
+                "The only valid keyword only arguments are `model_class` and `using_schema`.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        self.filter_clauses: list[Any] = (
+            list(kwargs["filter_clauses"]) if "filter_clauses" in kwargs else []
+        )
         self.or_clauses: list[Any] = []
-        self._aliases: dict[str, sqlalchemy.Alias] = {}
-        self.limit_count = limit
-        self._offset = offset
+        self.limit_count: int | None = kwargs.get("limit")
+        self._offset: int = kwargs.get("offset", 0)
         self._select_related: set[str] = set()
         # groups and order by
         self._select_related_g_and_o: set[str] = set()
         # embedded, like embed_parent or prefetches
         self._select_related_embedding: set[str] = set()
-        self._prefetch_related = list(prefetch_related)
-        self._batch_size = batch_size
-        self._order_by: tuple[str, ...] = tuple(order_by)
-        self._group_by: tuple[str, ...] = tuple(group_by)
+        self._prefetch_related: tuple[Prefetch, ...] = tuple(
+            kwargs.get("prefetch_related", _empty_set)
+        )
+        self._batch_size: int | None = kwargs.get("batch_size")
+        self._order_by: tuple[str, ...] = tuple(kwargs.get("order_by", _empty_set))
+        self._group_by: tuple[str, ...] = tuple(kwargs.get("group_by", _empty_set))
 
+        distinct = kwargs.get("distinct")
         if distinct is True:
             distinct = _empty_set
-        self.distinct_on = list(distinct) if distinct is not None else None
+        self.distinct_on: tuple[str, ...] | None = (
+            tuple(distinct) if distinct is not None else None
+        )
+        self._injected_create_handler: (
+            Callable[[dict[str, Any] | BaseModelType, Iterable], BaseModelType] | None
+        ) = None
         self._only: set[str] = set()
         self._defer: set[str] = set()
         self._embed_parent: tuple[str, str | str] | None = None
         self._embed_parent_filters: tuple[str, str | str] | None = None
-        self.using_schema = using_schema
-        self._extra_select = list(extra_select) if extra_select is not None else []
-        self._reference_select = (
-            reference_select.copy() if isinstance(reference_select, dict) else {}
+        self.using_schema: str | None | Any = using_schema
+        self._extra_select: tuple[sqlalchemy.ClauseElement, ...] = tuple(
+            kwargs.get("extra_select", _empty_set)
         )
-        self._exclude_secrets = exclude_secrets
+        self._reference_select: reference_select_type = {}
+        self._exclude_secrets: bool = kwargs.get("exclude_secrets", False)
         self._cache = QueryModelResultCache(attrs=self.pkcolumns)
         self._clear_cache(keep_result_cache=False)
         self._cached_select_related_expression: (
@@ -125,37 +146,49 @@ class BaseQuerySet(
         self.active_schema = self.get_schema()
         self._for_update: dict[str, Any] | None = None
 
+        table: sqlalchemy.Table | None = kwargs.get("table")
         if table is not None:
             self.table = table
+        database: Database | None = kwargs.get("database")
         if database is not None:
             self.database = database
 
         self._suppress_pk_deduplication: bool = False
 
+    def _create_clone_instance(self) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
+        """Base instance which is decorated later in clone."""
+        return cast("type[QuerySet]", type(self))(
+            model_class=self.model_class, using_schema=self.using_schema
+        )
+
     def _clone(self) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
-        This is core to the builder pattern.
+        This is core to the builder pattern. Most cache is refreshed
 
         Note: the _cached_select_related_expression is transferred.
         """
-        queryset = self.__class__(
-            self.model_class,
-            database=getattr(self, "_database", None),
-            filter_clauses=self.filter_clauses,
-            prefetch_related=self._prefetch_related,
-            limit=self.limit_count,
-            offset=self._offset,
-            batch_size=self._batch_size,
-            order_by=self._order_by,
-            group_by=self._group_by,
-            distinct=self.distinct_on,
-            using_schema=self.using_schema,
-            table=getattr(self, "_table", None),
-            exclude_secrets=self._exclude_secrets,
-            reference_select=self._reference_select,
-            extra_select=self._extra_select,
-        )
+        queryset = self._create_clone_instance()
+        queryset._database = getattr(self, "_database", None)
+        queryset._table = getattr(self, "_table", None)
+        queryset._prefetch_related = self._prefetch_related
+        queryset._exclude_secrets = self._exclude_secrets
+        # copying won't work, we would need a deep copy but not necessary anyway
+        queryset._reference_select = self._reference_select
+        queryset._offset = self._offset
+        # tuple, so we can just move it
+        queryset._order_by = self._order_by
+        # tuple, so we can just move it
+        queryset._group_by = self._group_by
+        # tuple, so we can just move it
+        queryset.distinct_on = self.distinct_on
+        # tuple, so we can just move it
+        queryset._extra_select = self._extra_select
+        queryset.limit_count = self.limit_count
+        queryset._batch_size = self._batch_size
+        queryset.filter_clauses.extend(self.filter_clauses)
         queryset.or_clauses.extend(self.or_clauses)
+        # this handles the create arguments
+        queryset._injected_create_handler = self._injected_create_handler
         queryset._embed_parent = self._embed_parent
         queryset._embed_parent_filters = self._embed_parent_filters
         queryset._only.update(self._only)
@@ -163,8 +196,9 @@ class BaseQuerySet(
         queryset._select_related.update(self._select_related)
         queryset._select_related_g_and_o.update(self._select_related_g_and_o)
         queryset._select_related_embedding.update(self._select_related_embedding)
+        # by default this is copied, we need to clear it when select_related caches are changing
         queryset._cached_select_related_expression = self._cached_select_related_expression
-        queryset._for_update = self._for_update.copy() if self._for_update is not None else None
+        queryset._for_update = self._for_update
         return cast("QuerySet", queryset)
 
     async def _as_select_with_tables(

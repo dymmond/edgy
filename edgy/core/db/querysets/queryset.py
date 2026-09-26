@@ -436,8 +436,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         return queryset
 
     def extra_select(
-        self,
-        *extra: sqlalchemy.ClauseElement,
+        self, *extra: sqlalchemy.ClauseElement, replace: bool = False
     ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Adds extra columns or expressions to the SELECT statement.
@@ -445,11 +444,16 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         Args:
             *extra (sqlalchemy.ColumnClause): Additional SQLAlchemy column clauses or expressions.
 
+        Kwargs:
+            replace: Stack (default) or replace the current extras with `replace=True`.
+
         Returns:
             QuerySetType: A new QuerySet with the extra select clauses.
         """
         queryset = self._clone()
-        queryset._extra_select.extend(extra)
+        if not replace:
+            extra = (*queryset._extra_select, *extra)
+        queryset._extra_select = extra
         return queryset
 
     def reference_select(self, references: reference_select_type) -> QuerySetType:
@@ -644,9 +648,9 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         if first is False:
             queryset.distinct_on = None
         elif first is True:
-            queryset.distinct_on = []
+            queryset.distinct_on = ()
         else:
-            queryset.distinct_on = [first, *distinct_on]
+            queryset.distinct_on = (first, *distinct_on)
         return queryset
 
     def only(self, *fields: str) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
@@ -1006,7 +1010,10 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         check_db_connection(queryset.database)
         token = CHECK_DB_CONNECTION_SILENCED.set(True)
         try:
-            instance = queryset.model_class(*args, **kwargs)
+            if fn := self._injected_create_handler:
+                instance = fn(kwargs, args)
+            else:
+                instance = queryset.model_class(*args, **kwargs)
             # apply_instance_extras filters out table Alias
             apply_instance_extras(
                 instance,
@@ -1182,8 +1189,12 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         try:
             raw_instance, resolved = await self._get_raw(kwargs=kwargs)
         except ObjectNotFound:
-            kwargs.update(defaults)
-            instance: EdgyEmbedTarget = await self.create(*args, **kwargs)
+            new_create_dict: dict[str, Any] = dict(defaults)
+            # we are somewhere else
+            for k, v in kwargs.items():
+                if "__" not in k:
+                    new_create_dict.setdefault(k, v)
+            instance: EdgyEmbedTarget = await self.create(*args, **new_create_dict)
             return instance, True
         for arg in args:
             if isinstance(arg, ModelRef):

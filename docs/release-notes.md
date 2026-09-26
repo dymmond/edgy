@@ -8,6 +8,7 @@
 - Allow sub-attributes (select_related) for prefetches as anchor.
 - Allow chaining `to_attr` to anchor by prefixing with `+`.
 - `crawl_relationship` has now a mode to traverse databases.
+- Add `replace` keyword to `extra_select`.
 
 ### Changed
 
@@ -29,19 +30,26 @@
 - Make `embed_parent` and `embed_parent_filters` internal (prefixed with `_`).
 - Identity checks may need an update when doing the check on a non-selected path (e.g. implicitly added paths for prefetches).
   Replace idioms `isinstance(user, User)` with `user.get_real_class() is User` for maximal compatibility.
+- Deprecate setting attributes on `QuerySet` via keywords (except `model_class` and `using_schema`).
+- Deprecate passing `model_class` to `QuerySet` as positional argument. Use keywords instead.
+- Calling `only` without arguments, reset the selected fields instead of setting them to `pknames` and `pkcolumns`.
+  This behavior matches the one of `defer`.
 
 ### Fixed
 
 - `ForeignKey`s on unique columns became incorrectly unique.
-- Using `create` in non-nullable ForeignKey relations.
+- Using `create` on non-nullable ForeignKey relations.
 - Don't mask AttributeErrors in managers when creating the queryset failed.
 - `to_attr` and `from_anchor` of Prefetch doesn't require explicit `select_related` calls anymore. They are deduced.
 - Performance issues with `update_embed_parent` when not using `select_related`. Also implicit deduced.
+- Direct bulk and other create operations on relations.
+  Note: The `create` operation stays special for relations.
+- Fix comparation between databases in `CombinedQuerySet`. Remove non-existing attributes and compare properly the urls.
 
 ### Removed
 
-- Remove long deprecated `fields` and `fields_mapping`.
-- Remove long deprecated `only_fields`, `defer_fields`, `distinct_on`, `limit_count`, `limit_offset` kwargs from QuerySet `__init__`.
+- Remove long deprecated `fields` and `fields_mapping` attributes of models.
+- Remove long deprecated `only_fields`, `defer_fields`, `distinct_on`, `limit_count`, `limit_offset` kwargs from `QuerySet` `__init__`.
 - Remove `only`, `defer`, `embed_parent`, `select_related` from QuerySet `__init__`. They need internal cleanup logic which shouldn't be called in `__init__` and may end in loops.
 
 
