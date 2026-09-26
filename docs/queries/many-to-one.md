@@ -6,7 +6,7 @@ Many-to-one relations are the inverse of a `ForeignKey`. There is only an implic
 
 With the many-to-one relation, you can perform all the normal operations of searching from normal queries to the [related_name][related_name] as per normal search.
 
-Many-to-one relations allow three different methods when using them (the same applies for the reverse side).
+Many-to-one relations allow some different methods when using them.
 
 * `add(obj) -> finalobj | None` - Adds a record to the relation (Updates the ForeignKey). Return `None` when adding was not possible.
 * `create(*args, **kwargs) -> finalobj | None` - Create a new record and add it to the relation. This method is deviating from `QuerySet.create` by returning `None` when not succeeding.

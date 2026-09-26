@@ -129,10 +129,12 @@ async def test_add_many_to_many_create():
     album = await Album.query.create(name="Malibu")
     assert await album.tracks.create(title="The Bird", position=1)
     assert await album.tracks.create(title="Heart don't stand a chance", position=2)
-    await album.tracks.create(title="The Waters", position=3)
-    assert await album.tracks.get_or_create(
+    track3 = await album.tracks.create(title="The Waters", position=3)
+    retrieved, created_flag = await album.tracks.get_or_create(
         {"track": {"title": "The Waters", "position": 30}}, title="The Waters"
     )
+    assert track3.id == retrieved.id
+    assert not created_flag
 
     total_tracks = await album.tracks.order_by("position")
     assert len(total_tracks) == 3
