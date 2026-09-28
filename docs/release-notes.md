@@ -2,9 +2,9 @@
 
 ## 0.37.1
 
-#### Fixed
+### Fixed
 
-- Misleading error when table couldn't be build and accessing `pkcolumns`.
+- Misleading error when table couldn't be built and accessing `pkcolumns`.
 
 ## 0.37.0
 

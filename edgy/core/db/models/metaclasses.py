@@ -1288,7 +1288,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         3. If none is passed, defaults to the shared schema of the database connected.
 
         Raises:
-            AttributeError: If no registry is found for the model, preventing table creation.
+            TableBuildError: If no registry is found for the model, preventing table creation.
         """
         if cls.__is_proxy_model__:
             return cls.__parent__.table  # type: ignore
