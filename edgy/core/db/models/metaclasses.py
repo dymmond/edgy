@@ -1272,7 +1272,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         try:
             cls._table = cls.build(cls.get_db_schema(), metadata=metadata)
         except AttributeError as exc:
-            raise TableBuildError(exc) from exc
+            raise TableBuildError(exc, detail="Building the table failed.") from None
 
     @property
     def table(cls) -> sqlalchemy.Table:
@@ -1295,7 +1295,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         if not cls.meta.registry:
             # we cannot set the table without a registry
             # raising is required
-            raise AttributeError("No registry.")
+            raise TableBuildError(detail="No registry found. Cannot build table.")
         table = getattr(cls, "_table", None)
         # assert table.name.lower() == cls.meta.tablename, f"{table.name.lower()} !=
         # {cls.meta.tablename}"
