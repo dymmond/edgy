@@ -1272,7 +1272,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         try:
             cls._table = cls.build(cls.get_db_schema(), metadata=metadata)
         except AttributeError as exc:
-            raise TableBuildError(exc, detail="Building the table failed.") from None
+            raise TableBuildError(exc, detail="Building the table failed.") from exc
 
     @property
     def table(cls) -> sqlalchemy.Table:
