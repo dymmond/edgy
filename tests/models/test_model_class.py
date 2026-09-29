@@ -4,7 +4,7 @@ import pytest
 
 import edgy
 from edgy.core.db.fields.base import Field
-from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound
+from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, TableBuildError
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
@@ -12,6 +12,21 @@ database = DatabaseTestClient(DATABASE_URL, force_rollback=False)
 models = edgy.Registry(database=database)
 
 pytestmark = pytest.mark.anyio
+
+
+class Unregistered(edgy.StrictModel):
+    id2: int = edgy.IntegerField(primary_key=True, autoincrement=True)
+
+    class Meta:
+        abstract = True
+
+
+class Unregistered2(edgy.StrictModel):
+    id2: int = edgy.IntegerField(primary_key=True, autoincrement=True)
+
+
+class Unregistered3(Unregistered):
+    id2: int = edgy.IntegerField(primary_key=True, autoincrement=True)
 
 
 class User(edgy.StrictModel):
@@ -61,13 +76,29 @@ def test_model_class():
     assert isinstance(User.query.meta.fields["name"], Field)
 
 
-def test_transactions():
+@pytest.mark.parametrize(
+    "model_class",
+    [
+        pytest.param(Unregistered, id="Unregistered"),
+        pytest.param(Unregistered2, id="Unregistered2"),
+        pytest.param(Unregistered3, id="Unregistered3"),
+    ],
+)
+def test_correct_exception(model_class):
+    with pytest.raises(TableBuildError):
+        model_class.pkcolumns  # noqa
+    with pytest.raises(TableBuildError):
+        model_class.table  # noqa
+    assert model_class.pknames == ("id2",)
+
+
+def test_can_call_transactions():
     user = User(id=1)
     User.transaction()
     user.transaction()
 
 
-def test_deferred_loading():
+def test_deferred_loading_doesnt_trigger():
     user = User(id=1)
     assert user._db_loaded_or_deleted is False
     user.identifying_db_fields  # noqa

@@ -1,5 +1,11 @@
 # Release Notes
 
+## 0.37.1
+
+### Fixed
+
+- Misleading error when table couldn't be built and accessing `pkcolumns`.
+
 ## 0.37.0
 
 ### Added

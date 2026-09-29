@@ -70,13 +70,13 @@ def build_pkcolumns(model_class: Any) -> tuple[str, ...]:
     that involve primary key constraints.
 
     Args:
-        model_class (Any): The model class for which to build primary key columns.
+        model_class (Any): The model class or instance for which to build primary key columns.
 
     Returns:
         tuple[str, ...]: A sorted tuple containing the names of the primary key
                          columns.
     """
-    table = model_class.table
+    table: Table = model_class.table
     pkcolumns: set[str] = set()
     for column in table.columns:
         if column.primary_key:

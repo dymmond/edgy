@@ -219,7 +219,7 @@ class BaseModelType(ABC):
     async def save(
         self,
         force_insert: bool = False,
-        values: dict[str, Any] | set[str] | list[str] | None = None,
+        values: dict[str, Any] | set[str] | None = None,
     ) -> BaseModelType:
         """
         Abstract asynchronous method for saving the model instance to the database.
@@ -229,7 +229,7 @@ class BaseModelType(ABC):
 
         Kwargs:
             force_insert (bool): If `True`, forces an SQL INSERT operation. Defaults to `False`.
-            values (dict[str, Any] | set[str] | list[str] | None): Optional. Values or field names
+            values (dict[str, Any] | set[str] | None): Optional. Values or field names
                                                                  to save. Defaults to `None`.
 
         Returns:
